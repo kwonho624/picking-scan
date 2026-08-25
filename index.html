@@ -1,0 +1,3822 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0f14">
+<title>물류 스캔 시스템</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="물류검수">
+<style>
+:root{
+  --bg:#0b0f14; --panel:#141b24; --panel2:#1c2530; --line:#2a3646;
+  --txt:#e8eef6; --dim:#8fa3b8;
+  --ok:#22c55e; --okd:#0d3f22;
+  --warn:#f59e0b; --err:#ef4444; --acc:#3b82f6; --pur:#a855f7;
+  --r:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overscroll-behavior:none}
+body{background:var(--bg);color:var(--txt);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Pretendard","Malgun Gothic",sans-serif;
+  display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.spacer{flex:1}
+
+header{flex:0 0 auto;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;
+  background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+.modechip{font-size:11px;font-weight:800;padding:4px 9px;border-radius:8px;white-space:nowrap}
+.modechip.A{background:#0d3f22;color:#7ee2a8}
+.modechip.B{background:#1e3a5f;color:#93c5fd}
+.modechip.C{background:#3b1d5c;color:#d8b4fe}
+.badge{font-size:11px;padding:4px 8px;border-radius:999px;font-weight:700;
+  background:var(--panel2);color:var(--dim);white-space:nowrap}
+.badge.fresh{background:var(--okd);color:#7ee2a8}
+.badge.stale{background:#4a3410;color:#fcd34d}
+.badge.old,.badge.off{background:#4a1414;color:#fca5a5}
+.iconbtn{width:36px;height:36px;border-radius:10px;background:var(--panel2);
+  display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+
+#scanbar{flex:0 0 auto;display:flex;align-items:center;gap:9px;
+  padding:9px 13px;background:var(--panel2);border-bottom:1px solid var(--line);
+  font-size:13px;color:var(--dim)}
+#scanbar .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:0 0 auto;
+  animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 9px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+#scanmsg{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#buf{color:var(--acc);font-weight:700}
+
+main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:13px 13px 110px}
+.empty{display:grid;place-items:center;min-height:70%;text-align:center;gap:16px;color:var(--dim)}
+.empty .big{font-size:52px;opacity:.35}
+.empty h2{color:var(--txt);font-size:19px;margin:0}
+.hint{font-size:12px;color:var(--dim);line-height:1.6}
+
+/* ---------- 모드 선택 ---------- */
+.modecard{display:flex;gap:14px;align-items:center;background:var(--panel);
+  border:1px solid var(--line);border-left:5px solid var(--line);
+  border-radius:var(--r);padding:16px;margin-bottom:11px;text-align:left;width:100%}
+.modecard .ic{flex:0 0 auto;width:48px;height:48px;border-radius:12px;display:grid;
+  place-items:center;font-size:23px;font-weight:900}
+.modecard.A{border-left-color:var(--ok)} .modecard.A .ic{background:var(--okd);color:#7ee2a8}
+.modecard.B{border-left-color:var(--acc)} .modecard.B .ic{background:#1e3a5f;color:#93c5fd}
+.modecard.C{border-left-color:var(--pur)} .modecard.C .ic{background:#3b1d5c;color:#d8b4fe}
+.modecard .tt{font-size:16px;font-weight:800}
+.modecard .dd{font-size:12.5px;color:var(--dim);margin-top:3px;line-height:1.5}
+.modecard[disabled]{opacity:.4}
+.flow{background:#010409;border:1px solid var(--line);border-radius:12px;padding:13px;
+  font-size:11.5px;color:var(--dim);line-height:1.8;margin-bottom:16px;text-align:center}
+
+/* ---------- 홈 화면 ---------- */
+.wcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:15px;margin-bottom:12px}
+.winput{width:100%;padding:14px;border-radius:11px;border:2px solid var(--line);
+  background:var(--panel2);color:var(--txt);font-size:18px;font-weight:700;margin-top:7px}
+.winput:focus{border-color:var(--acc);outline:none}
+.inrow{display:flex;gap:8px;align-items:stretch;margin-top:7px}
+.inrow .winput{margin-top:0}
+.statrow{display:flex;gap:9px;margin-bottom:13px}
+.stat{flex:1;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);
+  border-radius:12px;padding:11px 13px;min-width:0}
+.stat b{display:block;font-size:11px;color:var(--dim);font-weight:700;letter-spacing:.4px}
+.stat span{display:block;font-size:13px;font-weight:700;margin-top:3px;line-height:1.35}
+.stat.ok{border-left-color:var(--ok)} .stat.warn{border-left-color:var(--warn)}
+.stat.err{border-left-color:var(--err)}
+.notice{background:#3a2f10;border:1px solid #5a4a1a;color:#fcd34d;border-radius:12px;
+  padding:13px;font-size:13.5px;line-height:1.6;margin-top:14px}
+#newbar{display:none;align-items:center;gap:10px;padding:11px 13px;
+  background:#12203a;border-bottom:1px solid var(--acc);font-size:13.5px;font-weight:700}
+#newbar button{background:var(--acc);color:#04162e;padding:7px 14px;border-radius:9px;
+  font-weight:800;font-size:13px;flex:0 0 auto}
+
+/* ---------- 공통 카드 ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;margin-bottom:11px}
+.k{font-size:11px;color:var(--dim);letter-spacing:.5px}
+.v{font-size:20px;font-weight:800;letter-spacing:-.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.progbar{height:10px;background:#0a0e13;border-radius:999px;overflow:hidden;margin-top:12px}
+.progfill{height:100%;background:linear-gradient(90deg,var(--acc),var(--ok));width:0;transition:width .18s}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:6px}
+
+/* ---------- 라인 아이템 ---------- */
+.line{display:flex;gap:11px;align-items:center;background:var(--panel);
+  border:1px solid var(--line);border-left:4px solid var(--line);
+  border-radius:var(--r);padding:12px;margin-bottom:8px;
+  transition:border-color .15s,background .15s,transform .1s;width:100%;text-align:left}
+.line.done{border-left-color:var(--ok);background:#11241a}
+.line.partial{border-left-color:var(--warn)}
+.line.active{border-left-color:var(--acc);background:#101d2e;border-color:var(--acc)}
+.line.short{border-left-color:var(--err)}
+.shorttag{display:inline-block;background:#4a1414;color:#fca5a5;font-size:10.5px;
+  font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px}
+.line.hit{animation:hit .35s ease}
+@keyframes hit{0%{transform:scale(1)}35%{transform:scale(1.03)}100%{transform:scale(1)}}
+.line .info{flex:1;min-width:0}
+.line .nm{font-weight:700;font-size:15px;line-height:1.3;overflow:hidden;
+  text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.line .op{font-size:13px;color:var(--dim);margin-top:3px}
+.line .bc{font-size:11px;color:#647d96;margin-top:4px}
+.line .cnt{flex:0 0 auto;text-align:center;min-width:70px;padding:8px 6px;
+  background:var(--panel2);border-radius:10px}
+.line .cnt b{display:block;font-size:22px;font-weight:800;line-height:1}
+.line .cnt small{font-size:11px;color:var(--dim)}
+.line.done .cnt{background:var(--okd)} .line.done .cnt b{color:#7ee2a8}
+.chk{flex:0 0 auto;width:25px;height:25px;border-radius:50%;border:2px solid var(--line);
+  display:grid;place-items:center;font-size:13px;color:transparent}
+.line.done .chk{background:var(--ok);border-color:var(--ok);color:#05210f}
+
+/* ---------- 모드B 현재 로케이션 ---------- */
+.locbig{background:linear-gradient(160deg,#13253c,#0f1a29);border:2px solid var(--acc);
+  border-radius:16px;padding:18px;margin-bottom:13px}
+.locbig .lc{font-size:34px;font-weight:900;letter-spacing:-1px;line-height:1.05}
+.locbig .zone{display:inline-block;background:#1e3a5f;color:#93c5fd;font-size:11px;
+  font-weight:800;padding:3px 9px;border-radius:7px;margin-top:7px}
+.locbig .pn{font-size:19px;font-weight:800;margin-top:13px;line-height:1.3}
+.locbig .po{font-size:13px;color:var(--dim);margin-top:2px}
+.locbig .qtyrow{display:flex;align-items:flex-end;gap:12px;margin-top:14px;
+  padding-top:13px;border-top:1px solid #24405f}
+.locbig .qtybig{font-size:46px;font-weight:900;line-height:.95;letter-spacing:-2px}
+.locbig .qtybig small{font-size:20px;opacity:.5;font-weight:700}
+.verified{display:inline-flex;align-items:center;gap:5px;background:var(--okd);color:#7ee2a8;
+  font-size:11px;font-weight:800;padding:4px 10px;border-radius:7px}
+.unverified{background:#4a3410;color:#fcd34d}
+
+/* ---------- 하단 액션 ---------- */
+footer{position:fixed;left:0;right:0;bottom:0;
+  padding:12px 13px calc(env(safe-area-inset-bottom) + 12px);
+  background:linear-gradient(180deg,transparent,var(--bg) 22%);display:flex;gap:8px}
+.btn{flex:1;padding:15px;border-radius:var(--r);font-weight:800;font-size:15px;text-align:center;
+  background:var(--panel2);border:1px solid var(--line)}
+.btn.primary{background:var(--ok);color:#04210f;border-color:var(--ok)}
+.btn.primary:disabled{background:var(--panel2);color:#4b5c6e;border-color:var(--line)}
+.btn.blue{background:var(--acc);color:#04162e;border-color:var(--acc)}
+.btn.danger{background:#3f1d1d;color:#fca5a5;border-color:#7f1d1d}
+.btn.ghost{flex:0 0 auto;padding:15px 16px}
+
+/* ---------- 에러 홀딩 ---------- */
+#hold{position:fixed;inset:0;z-index:90;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:15px;padding:24px;text-align:center;
+  background:#7f1d1d;animation:flash .6s steps(1) infinite}
+#hold.on{display:flex}
+@keyframes flash{0%,49%{background:#7f1d1d}50%,100%{background:#b91c1c}}
+#hold .x{font-size:64px;line-height:1}
+#hold h2{font-size:25px;margin:0;font-weight:900;letter-spacing:-.5px}
+#hold p{margin:0;font-size:15px;max-width:340px;opacity:.95}
+#hold .code{background:rgba(0,0,0,.35);padding:9px 15px;border-radius:10px;
+  font-size:18px;font-weight:800;letter-spacing:1px}
+.pinrow{display:flex;gap:8px;margin-top:4px}
+.pinrow input{width:145px;padding:13px;border-radius:11px;border:2px solid rgba(255,255,255,.35);
+  background:rgba(0,0,0,.3);color:#fff;font-size:19px;text-align:center;letter-spacing:6px}
+.pinrow button{padding:13px 19px;border-radius:11px;background:#fff;color:#7f1d1d;font-weight:900}
+
+/* ---------- 숫자 키패드 ---------- */
+#pad{position:fixed;inset:0;z-index:87;background:#000c;display:none;
+  align-items:flex-end}
+#pad.on{display:flex}
+#pad .box{width:100%;background:var(--panel);border-radius:20px 20px 0 0;
+  padding:18px 14px calc(env(safe-area-inset-bottom) + 16px)}
+#pad .ttl{font-size:14px;color:var(--dim);text-align:center}
+#pad .item{font-size:17px;font-weight:800;text-align:center;margin:5px 0 3px}
+#pad .disp{font-size:52px;font-weight:900;text-align:center;letter-spacing:-2px;
+  padding:6px 0 4px;line-height:1}
+#pad .lim{text-align:center;font-size:12px;color:var(--dim);margin-bottom:12px}
+#pad .lim.over{color:var(--err);font-weight:800}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.keys button{padding:17px 0;border-radius:12px;background:var(--panel2);
+  border:1px solid var(--line);font-size:23px;font-weight:800}
+.keys button:active{background:#2a3646}
+.keys .wide{grid-column:span 1}
+#pad .acts{display:flex;gap:8px;margin-top:10px}
+
+/* ---------- 시트 ---------- */
+.sheet{position:fixed;inset:0;z-index:85;background:#000a;display:none}
+.sheet.on{display:block}
+.sheet .box{position:absolute;left:0;right:0;bottom:0;background:var(--panel);
+  border-radius:20px 20px 0 0;padding:20px 16px calc(env(safe-area-inset-bottom) + 20px);
+  max-height:88dvh;overflow-y:auto}
+.sheet h3{margin:0 0 12px;font-size:17px}
+.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.row label{flex:1;font-size:14px}
+.row .sub{font-size:11px;color:var(--dim);display:block;margin-top:2px}
+.row input[type=text],.row input[type=password]{flex:0 0 145px;padding:10px;border-radius:9px;
+  border:1px solid var(--line);background:var(--panel2);color:var(--txt);font-size:14px}
+.row input[type=checkbox]{width:22px;height:22px;flex:0 0 auto}
+.drop{border:2px dashed var(--line);border-radius:var(--r);padding:20px;text-align:center;
+  color:var(--dim);font-size:13.5px;margin:12px 0}
+.drop.over{border-color:var(--acc);background:#12203a;color:var(--txt)}
+/* ---------- 컬럼 매핑 ---------- */
+#map,#fq,#mv,#alt,#hist,#zn{position:fixed;inset:0;z-index:86;background:var(--bg);display:none;flex-direction:column}
+#map.on,#fq.on,#mv.on,#alt.on,#hist.on,#zn.on{display:flex}
+#fq{z-index:87} #mv{z-index:88} #alt{z-index:89} #hist{z-index:86} #zn{z-index:85}
+#zn .hd{flex:0 0 auto;padding:calc(env(safe-area-inset-top) + 14px) 14px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#zn .hd h3{margin:0 0 4px;font-size:17px} #zn .hd .s{font-size:12px;color:var(--dim)}
+#zn .bd{flex:1 1 auto;overflow:auto;padding:14px}
+#zn .ft{flex:0 0 auto;padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);background:var(--panel);border-top:1px solid var(--line);display:flex}
+.znbtn{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--panel);
+  border:1px solid var(--line);border-radius:11px;padding:15px 14px;margin-bottom:9px;cursor:pointer;color:var(--fg)}
+.znbtn:active{background:#1e293b}
+.znbtn.all{border-color:var(--acc);background:#0d1f38}
+.znbtn.mine{border-color:var(--ok)}
+.znbtn .zt{flex:1;font-size:16px;font-weight:800}
+.znbtn .zq{font-size:12.5px;color:var(--dim);white-space:nowrap;text-align:right;line-height:1.5}
+.znbtn .zq b{color:var(--fg);font-size:15px}
+#hist .hd{flex:0 0 auto;padding:calc(env(safe-area-inset-top) + 14px) 14px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#hist .hd h3{margin:0 0 4px;font-size:17px} #hist .hd .s{font-size:12px;color:var(--dim)}
+#hist .bd{flex:1 1 auto;overflow:auto;padding:14px}
+#hist .ft{flex:0 0 auto;padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);background:var(--panel);border-top:1px solid var(--line);display:flex}
+.hcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:9px}
+.hcard .ht{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hcard .hd1{font-weight:800;font-size:14px}
+.hcard .hs{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.5}
+.hcard .hb{display:flex;gap:7px;margin-top:9px}
+.hcard .hb button{flex:1;padding:9px 6px;border-radius:8px;font-size:12.5px;font-weight:700;
+  background:#0f172a;color:var(--fg);border:1px solid var(--line);cursor:pointer}
+.senttag{font-size:10.5px;font-weight:800;border-radius:5px;padding:2px 6px;white-space:nowrap}
+.senttag.ok{background:#0b3b21;color:#7ee2a8} .senttag.no{background:#3b2f0a;color:#fbbf24}
+#alt .hd{flex:0 0 auto;padding:calc(env(safe-area-inset-top) + 14px) 14px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#alt .hd h3{margin:0 0 4px;font-size:17px} #alt .hd .s{font-size:12px;color:var(--dim)}
+#alt .bd{flex:1 1 auto;overflow:auto;padding:14px}
+#alt .ft{flex:0 0 auto;padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);background:var(--panel);border-top:1px solid var(--line);display:flex}
+.altbtn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--panel);
+  border:1px solid var(--line);border-radius:10px;padding:14px 14px;margin-bottom:9px;cursor:pointer;color:var(--fg)}
+.altbtn:active{background:#1e293b}
+.altbtn .al{flex:1;font-family:ui-monospace,monospace;font-size:17px;font-weight:800}
+.altbtn .aq{font-size:12.5px;color:var(--dim);white-space:nowrap}
+.altbtn .aq b{color:#7ee2a8;font-size:15px}
+.subtag{display:inline-block;background:#3b2f0a;color:#fbbf24;font-size:10.5px;font-weight:800;
+  border-radius:5px;padding:2px 6px;margin-left:5px}
+#mv .hd{flex:0 0 auto;padding:calc(env(safe-area-inset-top) + 14px) 14px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#mv .hd h3{margin:0 0 4px;font-size:17px} #mv .hd .s{font-size:12px;color:var(--dim)}
+#mv .bd{flex:1 1 auto;overflow:auto;padding:14px}
+#mv .ft{flex:0 0 auto;padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);background:var(--panel);border-top:1px solid var(--line);display:flex}
+.mvrow{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.mvrow.move{border-color:#7c3aed;background:#221334}
+.mvrow .mvn{flex:1;min-width:0}
+.mvrow .mvn b{display:block;font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mvrow .mvn .l{font-size:12px;font-family:ui-monospace,monospace;color:var(--dim);margin-top:3px}
+.mvrow .mvq{font-weight:800;font-size:16px;font-family:ui-monospace,monospace;white-space:nowrap}
+.mvtag{font-size:10.5px;font-weight:800;border-radius:5px;padding:2px 6px;white-space:nowrap}
+.mvtag.mo{background:#4c1d95;color:#ddd6fe} .mvtag.ke{background:#3a3410;color:#e3d341}
+.mvtag.sh{background:#0b3b21;color:#7ee2a8} .mvtag.no{background:#3f1d1d;color:#fca5a5}
+#fq .hd{flex:0 0 auto;padding:calc(env(safe-area-inset-top) + 14px) 14px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#fq .hd h3{margin:0 0 4px;font-size:17px}
+#fq .hd .s{font-size:12px;color:var(--dim)}
+#fq .bd{flex:1 1 auto;overflow:auto;padding:14px}
+#fq .ft{flex:0 0 auto;padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);background:var(--panel);border-top:1px solid var(--line);display:flex}
+.fqcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.fqcard .fn{font-weight:700;font-size:14px;word-break:break-all}
+.fqcard .fi{font-size:11px;color:var(--dim);margin:3px 0 8px}
+.fqpick{display:flex;gap:6px;flex-wrap:wrap}
+.fqpick button{flex:1 1 30%;min-width:96px;padding:9px 6px;border-radius:8px;font-size:12.5px;font-weight:700;
+  background:#0f172a;color:var(--dim);border:1px solid var(--line);cursor:pointer}
+.fqpick button.sel{background:var(--acc);color:#04162e;border-color:var(--acc)}
+.fqpick button.skip.sel{background:#3f1d1d;color:#fca5a5;border-color:#7f1d1d}
+.fqwhy{font-size:11px;color:var(--ok);margin-top:6px}
+.catbox{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
+.catlbl{font-size:11.5px;color:var(--dim);font-weight:700;margin-bottom:6px}
+.catpick{display:flex;gap:6px;flex-wrap:wrap}
+.catpick button{padding:8px 12px;border-radius:999px;font-size:12.5px;font-weight:700;
+  background:#0f172a;color:var(--dim);border:1px solid var(--line);cursor:pointer}
+.catpick button.sel{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+.catpick button.add{border-style:dashed;color:#93c5fd}
+.catwarn{font-size:11px;color:var(--dim);margin-top:6px}
+#map .hd{flex:0 0 auto;padding:calc(env(safe-area-inset-top) + 14px) 14px 12px;
+  background:var(--panel);border-bottom:1px solid var(--line)}
+#map .hd h3{margin:0 0 4px;font-size:17px}
+#map .hd .s{font-size:12px;color:var(--dim)}
+#map .bd{flex:1;overflow-y:auto;padding:12px 14px 16px}
+.maprow{display:grid;grid-template-columns:78px 1fr;gap:8px 10px;align-items:center;
+  padding:9px 0;border-bottom:1px solid var(--line)}
+.maprow .mf{font-size:13px;font-weight:700;color:var(--dim)}
+.maprow.req .mf{color:var(--txt)}
+.maprow .star{color:var(--err);margin-left:2px}
+.maprow select{padding:10px;border-radius:9px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--txt);font-size:14px;width:100%}
+.maprow.bad select{border-color:var(--err);background:#2a1416}
+.maprow .mp{grid-column:2;font-size:11.5px;color:#7fd3a0;margin-top:-2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,monospace}
+#mapUnused{font-size:11.5px;color:var(--dim);margin-top:14px;line-height:1.6}
+#mapWarn{font-size:13px;margin-top:10px;font-weight:700}
+#map .ft{flex:0 0 auto;display:flex;gap:8px;padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);
+  background:var(--panel);border-top:1px solid var(--line)}
+#ask{position:fixed;inset:0;z-index:98;background:#020617e6;display:none;
+  align-items:center;justify-content:center;padding:20px}
+#ask.on{display:flex}
+#ask .box{width:100%;max-width:400px;max-height:88vh;overflow:auto;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;padding:20px 18px}
+#ask .ttl{font-size:17px;font-weight:800;margin-bottom:9px}
+#ask .msg{font-size:14px;line-height:1.65;color:#cbd5e1;white-space:pre-wrap;margin-bottom:14px}
+#ask .msg b{color:var(--fg)} #ask .msg .warn{color:var(--warn)} #ask .msg .err{color:var(--err)}
+#ask input,#ask textarea{width:100%;padding:14px 12px;font-size:16px;border-radius:10px;
+  background:#0f172a;color:var(--fg);border:1px solid var(--line);margin-bottom:12px}
+#ask textarea{min-height:132px;font-family:inherit;line-height:1.6}
+#ask .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+#ask .opts button{width:100%;text-align:left;padding:15px 14px;border-radius:10px;font-size:15px;
+  font-weight:700;background:#0f172a;color:var(--fg);border:1px solid var(--line);cursor:pointer}
+#ask .opts button:active{background:#1e293b}
+#ask .opts button b{display:block;font-size:15px}
+#ask .opts button span{display:block;font-size:12px;color:var(--dim);font-weight:600;margin-top:3px}
+#ask .acts{display:flex;gap:9px}
+#ask .acts .btn{flex:1;padding:14px}
+#ask .acts .btn.danger{background:#7f1d1d;color:#fecaca;border-color:#7f1d1d}
+
+#busy{position:fixed;inset:0;z-index:97;background:#020617e6;display:none;
+  align-items:center;justify-content:center;padding:24px}
+#busy.on{display:flex}
+#busy .box{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:22px 20px;text-align:center}
+#busy .ttl{font-size:17px;font-weight:800;margin-bottom:6px}
+#busy .sub{font-size:12.5px;color:var(--dim);margin-bottom:14px;min-height:17px}
+#busy .bar{height:10px;background:#0f172a;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+#busy #busyFill{height:100%;width:0%;background:var(--acc);transition:width .15s linear}
+#busy .pct{margin-top:9px;font-size:14px;font-weight:800;color:var(--acc)}
+
+#cam{position:fixed;inset:0;z-index:95;background:#000;display:none}
+#cam.on{display:block}
+#cam video{width:100%;height:100%;object-fit:cover}
+#cam .frame{position:absolute;left:10%;right:10%;top:38%;height:22%;
+  border:3px solid var(--acc);border-radius:12px;box-shadow:0 0 0 100vmax rgba(0,0,0,.55)}
+#cam .close{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:14px;
+  background:#000a;padding:12px 18px;border-radius:999px;font-weight:800}
+#cam .camtop{position:absolute;top:calc(env(safe-area-inset-top) + 14px);left:14px;right:120px;
+  background:#000a;padding:10px 14px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.45}
+#cam .camtop small{display:block;font-weight:600;opacity:.75;font-size:11.5px;margin-top:2px}
+#cam .camacts{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 18px);
+  display:flex;gap:9px}
+#cam .camacts button{flex:1;padding:15px 8px;border-radius:12px;font-size:14px;font-weight:800;
+  border:0;background:#ffffff;color:#111;cursor:pointer}
+#cam .camacts button.ghost{background:#000a;color:#fff;border:1px solid #ffffff55}
+#cam .camacts button.on{background:var(--warn);color:#111}
+#cam .camhit{position:absolute;left:10%;right:10%;top:63%;text-align:center;
+  font-family:ui-monospace,monospace;font-size:20px;font-weight:800;color:#7ee2a8;
+  text-shadow:0 2px 8px #000;min-height:26px}
+
+/* ---------- 모드 B 3단계 ---------- */
+.steps{display:flex;gap:6px;margin-bottom:11px}
+.stp{flex:1;padding:8px 4px;border-radius:9px;background:var(--panel);
+  border:1px solid var(--line);font-size:11.5px;font-weight:700;color:var(--dim);text-align:center}
+.stp b{display:block;font-size:14px;margin-bottom:1px}
+.stp.on{background:var(--acc);color:#04162e;border-color:var(--acc)}
+.stp.ok{background:var(--okd);color:#7ee2a8;border-color:#1d5c35}
+.locbig.toStep{border-color:var(--pur);background:linear-gradient(160deg,#2a1740,#160f24)}
+.guide{margin-top:13px;padding:10px 12px;background:rgba(0,0,0,.28);border-radius:10px;
+  font-size:13px;line-height:1.55;color:#cfe0f2}
+.movetag{display:inline-block;background:#3b1d5c;color:#d8b4fe;font-size:10.5px;
+  font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px}
+.kepttag{display:inline-block;background:#3a3410;color:#e3d341;font-size:10.5px;
+  font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px}
+
+/* ---------- 진행 현황 목록 ---------- */
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tab{flex:1;padding:10px 6px;border-radius:10px;background:var(--panel);
+  border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--dim)}
+.tab.on{background:var(--acc);color:#04162e;border-color:var(--acc)}
+.tab.csv{flex:0 0 auto;padding:10px 12px;color:var(--txt)}
+.brow{display:flex;align-items:center;gap:11px;background:var(--panel);
+  border:1px solid var(--line);border-left:4px solid var(--line);
+  border-radius:11px;padding:11px 13px;margin-bottom:7px}
+.brow.ok{border-left-color:var(--ok);background:#101d15}
+.bchk{flex:0 0 auto;width:23px;height:23px;border-radius:50%;border:2px solid var(--line);
+  display:grid;place-items:center;font-size:12px;color:transparent}
+.brow.ok .bchk{background:var(--ok);border-color:var(--ok);color:#04210f}
+.binfo{flex:1;min-width:0}
+.bno{font-size:15px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bsub{font-size:12px;color:var(--dim);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btime{flex:0 0 auto;text-align:right;min-width:64px}
+.btime b{display:block;font-size:15px;font-weight:800;color:#7ee2a8;
+  font-family:ui-monospace,Menlo,monospace}
+.btime small{display:block;font-size:10.5px;color:var(--dim);margin-top:1px}
+.waiting{font-size:12px;color:var(--warn);font-weight:700}
+
+/* ---------- 항상 떠 있는 입력줄 (스캐너·키보드 공용) ---------- */
+#entrybar{display:none;align-items:center;gap:8px;padding:9px 13px;
+  background:var(--panel);border-bottom:1px solid var(--line)}
+#entrybar.on{display:flex}
+#entrybar label{flex:0 0 auto;font-size:12px;color:var(--dim);font-weight:700;white-space:nowrap}
+#entrybar input{flex:1;min-width:0;padding:11px 13px;border-radius:10px;
+  border:2px solid var(--line);background:var(--panel2);color:var(--txt);
+  font-size:16px;font-weight:700;font-family:ui-monospace,Menlo,monospace}
+#entrybar input:focus{border-color:var(--acc);outline:none;background:#0f1a29}
+#entrybar input::placeholder{font-family:inherit;font-weight:500;font-size:13px;color:#647d96}
+#entrybar button{flex:0 0 auto;background:var(--acc);color:#04162e;
+  padding:11px 16px;border-radius:10px;font-weight:800;font-size:14px}
+#entrybar.locked input{opacity:.4;pointer-events:none}
+#entrybar.locked button{opacity:.4;pointer-events:none}
+
+/* ---------- PC 화면: 가운데 한 컬럼으로 (창고 PC는 화면이 넓습니다) ---------- */
+@media (min-width:700px){
+  body{background:#06090d}
+  header,#scanbar,#newbar,#entrybar,main{max-width:760px;width:100%;margin-left:auto;margin-right:auto}
+  header,#scanbar,#entrybar{border-left:1px solid var(--line);border-right:1px solid var(--line)}
+  #entrybar input{font-size:18px;padding:13px 15px}
+  main{background:var(--bg);border-left:1px solid var(--line);border-right:1px solid var(--line)}
+  footer{max-width:760px;margin:0 auto}
+  .empty{min-height:auto;padding:30px 0}
+  .winput{font-size:19px;padding:15px}
+}
+#toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);
+  z-index:80;background:#000d;border:1px solid var(--line);padding:11px 19px;border-radius:999px;
+  font-weight:700;font-size:14px;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{background:var(--ok);color:#04210f;border-color:var(--ok)}
+#toast.err{background:var(--err);color:#fff;border-color:var(--err)}
+</style>
+</head>
+<body>
+
+<header>
+  <button class="iconbtn" id="btnHome" title="모드 선택" style="display:none">☰</button>
+  <h1 id="title">물류 스캔</h1>
+  <span class="badge" id="verBadge" style="opacity:.6">v1.1</span>
+  <span class="modechip" id="modeChip" style="display:none"></span>
+  <span class="spacer"></span>
+  <span class="badge" id="snapBadge">데이터 없음</span>
+  <span class="badge" id="qbadge" style="display:none"></span>
+  <button class="iconbtn" id="btnCam" title="카메라">▣</button>
+  <button class="iconbtn" id="btnCfg" title="설정">⚙</button>
+</header>
+
+<div id="scanbar">
+  <span class="dot"></span>
+  <span id="scanmsg">모드를 선택하세요</span>
+  <span class="spacer"></span>
+  <span id="buf" class="mono"></span>
+</div>
+
+<div id="newbar">
+  <span id="newbarTxt">새 출고 데이터가 있습니다</span>
+  <span class="spacer"></span>
+  <button onclick="pullServer()">받기</button>
+</div>
+
+<div id="entrybar">
+  <label id="entryLabel" for="entry">송장번호</label>
+  <input id="entry" type="text" autocomplete="off" autocorrect="off" spellcheck="false"
+    placeholder="스캔하거나 키보드로 입력 후 Enter">
+  <button id="entryGo">입력</button>
+</div>
+
+<main id="main"></main>
+
+<footer id="foot" style="display:none"></footer>
+
+<div id="hold">
+  <div class="x">⛔</div>
+  <h2 id="holdTitle">중단</h2>
+  <div class="code mono" id="holdCode"></div>
+  <p id="holdMsg"></p>
+  <div class="pinrow" id="pinrow" style="display:none">
+    <input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN">
+    <button id="pinOk">해제</button>
+  </div>
+  <button id="holdOk" style="margin-top:6px;padding:16px 34px;font-size:18px;font-weight:800;
+    border-radius:12px;background:#fff;color:#111;border:0;cursor:pointer;min-width:200px">확인</button>
+  <p style="font-size:12px;opacity:.75" id="holdHint">확인을 누르면 이전 화면으로 돌아갑니다 · 오류는 자동 기록됩니다</p>
+</div>
+
+<div id="pad">
+  <div class="box">
+    <div class="ttl" id="padTtl">수량 입력</div>
+    <div class="item" id="padItem"></div>
+    <div class="disp mono" id="padDisp">0</div>
+    <div class="lim" id="padLim"></div>
+    <div class="keys">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button data-k="C">C</button><button data-k="0">0</button><button data-k="←">←</button>
+    </div>
+    <div class="acts">
+      <button class="btn ghost" id="padCancel">취소</button>
+      <button class="btn primary" id="padOk">확인</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="cfg">
+  <div class="box">
+    <h3>설정</h3>
+    <div class="row"><label>작업자<span class="sub">모든 기록에 남습니다</span></label><input type="text" id="cfgWorker" placeholder="이름"></div>
+    <div class="row"><label>공유 서버 주소<span class="sub">Apps Script 웹앱 URL — 이걸 넣어야 함께 봅니다</span></label><input type="text" id="cfgApi" placeholder="https://script.google.com/.../exec"></div>
+    <div class="row"><label>공유키<span class="sub">시트에 SHARE_KEY를 설정한 경우만</span></label><input type="password" id="cfgKey"></div>
+    <div class="row"><label>스캔값에서 지울 문자<span class="sub">PDA가 붙이는 표시. 쉼표로 여러 개 · <b>~#a#~</b> 형태는 기본 제거</span></label><input type="text" id="cfgStrip" placeholder="예: ~#a#~,PRE-"></div>
+    <div class="row"><label>새 데이터 자동 확인<span class="sub">30초마다 확인해 상단에 알립니다</span></label><input type="checkbox" id="cfgAutoSync"></div>
+    <div class="row"><label>관리자 PIN<span class="sub">초기화·설정 잠금에 사용</span></label><input type="password" id="cfgPin" inputmode="numeric"></div>
+    <div class="row"><label>오류 해제에 PIN 요구<span class="sub">끄면 [확인] 한 번으로 이전 화면 복귀 (권장)</span></label><input type="checkbox" id="cfgPinErr"></div>
+    <div class="row"><label>토탈 피킹 3단계 검증<span class="sub">출발위치 → 상품 → 처리(출고/이동). 끄면 상품만 스캔</span></label><input type="checkbox" id="cfg3"></div>
+    <div class="row"><label>수량 직접 입력 허용<span class="sub">대량 피킹 시 숫자 입력. 품목 스캔 검증은 유지됩니다</span></label><input type="checkbox" id="cfgQty"></div>
+    <div class="row"><label>품목 스캔 없이 수량만 입력<span class="sub" style="color:#fca5a5">⚠ 오출고 방어선이 사라집니다. 권장하지 않음</span></label><input type="checkbox" id="cfgQtyOnly"></div>
+    <div class="row"><label>완료 시 자동 제출</label><input type="checkbox" id="cfgAuto"></div>
+    <div class="row"><label>소리 / 진동</label><input type="checkbox" id="cfgSound"></div>
+
+    <div class="drop" id="drop">
+      <b>📁 파일 올리기</b><br>
+      <span class="hint">출고 검수 파일 · 토탈 피킹 파일을 <b>한 번에 여러 개</b> 올리세요<br>
+      올린 뒤 파일마다 <b>A / B</b> 를 고르는 화면이 나옵니다</span>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden multiple>
+    </div>
+
+    <div class="notice" style="margin:6px 0 10px">
+      <b>👤 관리자만</b> — 아래 <b>전체 공유</b>를 누르면 지금 이 앱의 데이터가
+      모든 작업자 기기에 반영됩니다. 작업자는 홈에서 <b>최신 데이터 받기</b>만 누르면 됩니다.
+    </div>
+    <div style="display:flex;gap:8px;margin:10px 0">
+      <button class="btn primary" id="btnPublish">📤 전체 공유</button>
+      <button class="btn blue" id="btnSync">↓ 받기</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <button class="btn" id="btnPing" style="font-size:13px">연결 테스트</button>
+      <button class="btn" id="btnLink" style="font-size:13px">🔗 초대 링크</button>
+      <button class="btn" id="btnDiag" style="font-size:13px">🩺 진단</button>
+      <button class="btn" id="btnHist" style="font-size:13px">📋 피킹 이력</button>
+      <button class="btn" id="btnZone" style="font-size:13px">🗂 분류 설정</button>
+      <button class="btn" id="btnOpen" style="font-size:13px">주소 직접 열기</button>
+      <button class="btn" id="btnDemo" style="font-size:13px">데모 데이터</button>
+      <button class="btn" id="btnRemap" style="font-size:13px">매핑 초기화</button>
+      <button class="btn danger" id="btnReset" style="font-size:13px">🔄 초기화</button>
+    </div>
+    <button class="btn primary" id="btnInstall" style="width:100%;margin-bottom:6px;display:none">📲 바탕화면(홈 화면)에 추가</button>
+    <p class="hint" id="cfgStat"></p>
+    <button class="btn" id="cfgClose" style="margin-top:10px">닫기</button>
+  </div>
+</div>
+
+<div id="zn">
+  <div class="hd">
+    <h3>어느 분류를 맡으시나요?</h3>
+    <div class="s" id="znSub"></div>
+  </div>
+  <div class="bd">
+    <p class="hint" style="margin:0 0 10px">
+      파일을 올릴 때 붙인 <b>분류</b>대로 나뉩니다.
+      여러 명이 같이 할 때 각자 맡을 분류를 고르세요. 혼자면 <b>전체</b>.
+    </p>
+    <div id="znBody"></div>
+  </div>
+  <div class="ft" style="flex-direction:column;gap:8px">
+    <button class="btn ghost" id="znEdit" style="width:100%">🗂 분류 이름 설정</button>
+    <button class="btn ghost" id="znCancel" style="width:100%">취소</button>
+  </div>
+</div>
+
+<div id="hist">
+  <div class="hd">
+    <h3>📋 토탈 피킹 이력</h3>
+    <div class="s" id="histSub"></div>
+  </div>
+  <div class="bd">
+    <p class="hint" style="margin:0 0 10px">
+      완료한 피킹은 <b>이 기기에 30일간</b> 남습니다. 인터넷이나 구글시트와 무관합니다.
+      <b>CSV</b> 로 뽑아 WMS 에 반영하세요.
+    </p>
+    <div id="histBody"></div>
+  </div>
+  <div class="ft" style="flex-direction:column;gap:8px">
+    <button class="btn blue" id="histAll" style="width:100%">⤓ 전체 CSV 내보내기</button>
+    <button class="btn ghost" id="histClose" style="width:100%">닫기</button>
+  </div>
+</div>
+
+<div id="alt">
+  <div class="hd">
+    <h3>🔍 다른 로케이션 찾기</h3>
+    <div class="s" id="altSub"></div>
+  </div>
+  <div class="bd">
+    <p class="hint" style="margin:0 0 10px">
+      지시된 자리에 물건이 없을 때 씁니다. <b>실제로 가져온 자리를 누르세요.</b>
+      대체로 처리한 줄은 기록에 <b>대체</b>로 따로 남습니다.
+    </p>
+    <div id="altBody"></div>
+  </div>
+  <div class="ft"><button class="btn ghost" id="altClose" style="width:100%">취소</button></div>
+</div>
+
+<div id="mv">
+  <div class="hd">
+    <h3>🚚 로케이션 이동 내역</h3>
+    <div class="s" id="mvSub"></div>
+  </div>
+  <div class="bd">
+    <p class="hint" style="margin:0 0 10px">
+      아래 <b>이동</b> 건만 WMS 에 재고 이동으로 입력하면 됩니다.
+      <b>출고</b>·<b>제자리</b>는 입력할 것이 없습니다.
+    </p>
+    <div id="mvBody"></div>
+  </div>
+  <div class="ft" style="flex-direction:column;gap:8px">
+    <div style="display:flex;gap:8px;width:100%">
+      <button class="btn blue" id="mvCopy" style="flex:1">📋 이동분 복사</button>
+      <button class="btn blue" id="mvCsv" style="flex:1">⤓ CSV</button>
+    </div>
+    <button class="btn primary" id="mvClose" style="width:100%">닫기</button>
+  </div>
+</div>
+
+<div id="fq">
+  <div class="hd">
+    <h3>파일 종류 확인</h3>
+    <div class="s" id="fqSub"></div>
+  </div>
+  <div class="bd">
+    <p class="hint" style="margin:0 0 10px">
+      파일마다 <b>어떤 양식인지</b> 골라주세요. 자동으로 추측해 두었습니다 —
+      <b>다른 것만 바꾸면 됩니다.</b>
+    </p>
+    <div id="fqBody"></div>
+  </div>
+  <div class="ft" style="flex-direction:column;gap:8px">
+    <button class="btn primary" id="fqOk" style="width:100%">적용</button>
+    <button class="btn ghost" id="fqCancel" style="width:100%">취소</button>
+  </div>
+</div>
+
+<div id="map">
+  <div class="hd">
+    <h3 id="mapTtl">컬럼 확인</h3>
+    <div class="s" id="mapSub"></div>
+  </div>
+  <div class="bd">
+    <p class="hint" style="margin:0 0 10px">
+      엑셀 헤더를 자동으로 찾았습니다. <b>틀린 것만 바꿔주세요.</b>
+      <span class="star" style="color:var(--err)">*</span> 는 필수입니다.
+      한 번 확정하면 다음부터는 자동으로 적용됩니다.
+    </p>
+    <div id="mapBody"></div>
+    <div id="mapUnused"></div>
+    <div id="mapWarn"></div>
+  </div>
+  <div class="ft" style="flex-direction:column;gap:8px">
+    <button class="btn primary" id="mapOk" style="width:100%">적용</button>
+    <div style="display:flex;gap:8px;width:100%">
+      <button class="btn ghost" id="mapCancel">취소</button>
+      <button class="btn ghost" id="mapReset">자동인식</button>
+      <button class="btn blue" id="mapShare">📤 적용 + 전체 공유</button>
+    </div>
+  </div>
+</div>
+
+<div id="cam">
+  <video id="vid" playsinline muted></video>
+  <div class="frame"></div>
+  <div class="camtop" id="camTop">바코드를 사각형 안에 맞추세요<small id="camSub"></small></div>
+  <div class="camhit" id="camHit"></div>
+  <div class="camacts">
+    <button class="ghost" id="camTorch">🔦 조명</button>
+    <button id="camType">⌨ 번호 직접 입력</button>
+  </div>
+  <button class="close" id="camClose">닫기 ✕</button>
+</div>
+
+<div id="ask">
+  <div class="box">
+    <div class="ttl" id="askTtl"></div>
+    <div class="msg" id="askMsg"></div>
+    <div id="askIn"></div>
+    <div class="acts">
+      <button class="btn ghost" id="askNo">취소</button>
+      <button class="btn primary" id="askYes">확인</button>
+    </div>
+  </div>
+</div>
+
+<div id="busy">
+  <div class="box">
+    <div class="ttl" id="busyTtl">처리 중</div>
+    <div class="sub" id="busySub"></div>
+    <div class="bar"><div id="busyFill"></div></div>
+    <div class="pct mono" id="busyPct">0%</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+ *  물류 스캔 시스템 — v1.1
+ *  모드 A 출고검수 / 모드 B 토탈피킹 / 모드 C 분배(DAS)
+ *
+ *  설계 원칙
+ *   1) 판정은 100% 로컬. 네트워크는 결과 기록에만.
+ *   2) 상태는 명시적 상태머신으로만 전이.
+ *   3) 수량 직접 입력을 허용하되 "품목 검증 스캔"은 유지 → 오출고 주원인 차단.
+ *   4) 입력 방식(SCAN/MANUAL)을 로그에 남겨 사후 원인 분석 가능하게.
+ * ========================================================================= */
+
+/* ---------- 0. 스토리지 어댑터 ---------- */
+const Store=(()=>{let ok=true,mem={};
+  try{localStorage.setItem("__t","1");localStorage.removeItem("__t")}catch(e){ok=false}
+  return{get(k,d){try{const v=ok?localStorage.getItem(k):mem[k];return v==null?d:JSON.parse(v)}catch(e){return d}},
+    set(k,v){try{const s=JSON.stringify(v);ok?localStorage.setItem(k,s):(mem[k]=s)}catch(e){}},healthy:ok}})();
+
+/* ---------- 1. 설정 ---------- */
+/* ┌─────────────────────────────────────────────────────────────────────┐
+   │ 공유 서버 자동 설정 — 아래 두 줄만 채우면 모든 기기가 설정 없이 연결됩니다.│
+   │ (GitHub 공개 저장소에 올린다면 SHARE_KEY 를 반드시 함께 쓰세요)          │
+   └─────────────────────────────────────────────────────────────────────┘ */
+const DEFAULT_API = "https://script.google.com/macros/s/AKfycbxsP69cf4ZDuttKalQsd2UB3hVWmeG-015qB58WkrjFNa7ZTMFIYYTAgBloWf4Zaz67/exec";
+const DEFAULT_KEY = "";      // 시트 SHARE_KEY 를 쓴다면 같은 값 (공개 저장소면 비워두세요)
+
+/* URL 파라미터로도 넣을 수 있습니다 (초대 링크)
+   ...index.html?api=<주소>&key=<공유키>&worker=<이름>
+   ?  대신 #  도 됩니다(#api=...). 서버 로그에 주소가 안 남아 더 안전합니다. */
+function parseParams_(){
+  const out={};
+  const grab=s=>{ if(!s)return; s.replace(/^[?#]/,"").split("&").forEach(p=>{
+    const i=p.indexOf("="); if(i<0)return;
+    const k=decodeURIComponent(p.slice(0,i)).toLowerCase();
+    let v=""; try{ v=decodeURIComponent(p.slice(i+1).replace(/\+/g," ")) }catch(e){ v=p.slice(i+1) }
+    if(v&&out[k]===undefined)out[k]=v; })};
+  try{ grab(location.hash); grab(location.search); }catch(e){}
+  return out;
+}
+const BOOT=parseParams_();
+
+const CFG=Object.assign({
+  worker:"",api:"",apiSrc:"",shareKey:"",pin:"1234",autoSubmit:true,sound:true,
+  allowQty:true,        // 수량 직접 입력 허용 (품목 스캔 검증은 유지)
+  allowQtyOnly:false,   // 품목 스캔 없이 수량만 — 기본 OFF (오출고 방어선)
+  autoSync:true,        // 새 데이터가 올라오면 자동으로 알림
+  pinOnError:false,     // 오류 해제에 관리자 PIN 요구 (기본 끔 — 현장 속도 우선)
+  cats:["대화물","소화물","베이비룸","천일","쿠팡","수출"],   // 토탈 피킹 파일 분류
+  stripPat:"",          // 스캔값에서 지울 문자열 (PDA 접두·접미 표시)
+  lastZone:"",          // 이 기기가 마지막에 맡은 구역 (다음에 기본 선택)
+  threeStep:true,       // 모드B 3단계 검증 (출발위치 → 상품 → 도착위치)
+  deviceId:uuid()
+}, Store.get("cfg",{}));
+const saveCfg=()=>Store.set("cfg",CFG);
+/* v1.1: 로케이션 앞자리 규칙 기능을 없앴습니다.
+   예전 버전에서 저장된 규칙이 남아 있으면 분류를 가로막으므로 정리합니다. */
+if(CFG.zoneRules!==undefined){ delete CFG.zoneRules; saveCfg() }
+
+/* --- 공유 주소 자동 채우기 : 링크 > 저장값 > 코드 기본값 --- */
+const BOOT_MSG=[];
+function safeApi_(u){                       // 아무 주소나 받으면 데이터가 남의 서버로 갑니다
+  if(!u)return false;
+  try{ const x=new URL(u);
+    return x.protocol==="https:" && /(^|\.)google\.com$/.test(x.hostname) && /\/exec\/?$/.test(x.pathname);
+  }catch(e){ return false }
+}
+function autoApi(P){
+  P=P||BOOT; let changed=false;
+  const fromLink=P.api||P.url||"";
+  if(fromLink){
+    if(!safeApi_(fromLink)) BOOT_MSG.push("⚠ 링크의 주소가 올바른 Apps Script(/exec) 주소가 아니라 무시했습니다");
+    else if(CFG.api!==fromLink){ CFG.api=fromLink; changed=true;
+      BOOT_MSG.push("공유 서버가 링크로 자동 설정되었습니다"); }
+  }
+  else if(DEFAULT_API&&safeApi_(DEFAULT_API)&&CFG.api!==DEFAULT_API&&CFG.apiSrc!=="manual"&&CFG.apiSrc!=="link"){
+    // 비어 있거나, 예전 앱버전이 심어둔 옛 주소가 남아 있는 경우 → 새 기본값으로 갱신
+    CFG.api=DEFAULT_API; CFG.apiSrc="default"; changed=true;
+    BOOT_MSG.push("공유 서버가 자동 설정되었습니다");
+  }
+  if(fromLink&&safeApi_(fromLink))CFG.apiSrc="link";
+  const k=P.key||P.sharekey||"";
+  if(k)CFG.shareKey=k; else if(!CFG.shareKey&&DEFAULT_KEY)CFG.shareKey=DEFAULT_KEY;
+  if(P.worker&&!CFG.worker)CFG.worker=P.worker;
+  if(fromLink||k||P.worker||changed){
+    saveCfg();
+    // 주소창에서 파라미터를 지운다 (새로고침/공유 시 키가 다시 노출되지 않도록)
+    try{ history.replaceState(null,"",location.pathname); }catch(e){}
+  }else if(CFG.api){ saveCfg(); }
+  return changed;
+}
+autoApi();
+/* 앱이 이미 열린 상태에서 새 초대 링크를 눌러도 반영되게 (hash 만 바뀌면 새로고침이 안 됨) */
+window.addEventListener("hashchange",()=>{
+  const P=parseParams_(); if(!P.api&&!P.key)return;
+  BOOT_MSG.length=0;
+  const ch=autoApi(P);
+  if(BOOT_MSG.length&&typeof toast==="function")toast(BOOT_MSG[0],BOOT_MSG[0][0]==="⚠"?"err":"ok");
+  if(ch&&typeof pullServer==="function")pullServer();
+});
+
+/* ---------- 2. 전역 상태 ---------- */
+const S={
+  mode:null,                 // null | 'A' | 'B' | 'C'
+  phase:"IDLE",              // IDLE | ORDER_LOADED | PICKING | SORTING | ERROR_HOLD | DONE
+  orders:new Map(),          // key -> {invoice_no, lines[]} (별칭 키는 같은 객체를 가리킴)
+  aliasKeys:new Set(),       // 주문번호·관리번호처럼 조회용으로만 등록된 키
+  wmsRows:[], wmsAt:0,       // WMS 토탈 피킹 리스트 (모드 B 직접 소스)
+  stockRows:[],              // 정상재고 전체 (수량 0 포함) — 대체 로케이션 찾기용
+  stockIdx:new Map(),        // norm(barcode) -> [{loc, qty}]
+  done:new Map(Store.get("done",[])),   // 송장키 -> {at, worker, errors, lines[]} 검수 완료 기록
+  listFilter:"todo", listQ:"",          // 진행 현황 화면 필터
+  doneSnap:Store.get("doneSnap",""),    // 위 done 기록이 "어느 데이터"의 것인지
+  progAt:Store.get("progAt",""), boxCache:null,   // 동시작업 동기화 시각 / 목록 캐시
+  rows:[],                   // 원본 정규화 행
+  locMap:new Map(),          // sku -> [{location_code, zone, prio}]
+  skuMaster:new Map(),       // barcode -> sku
+  snapshotAt:0, snapshotId:"",
+  cur:null,                  // 모드A 현재 주문
+  pick:null,                 // 모드B {batchId, lines[], idx}
+  lastPick:Store.get("lastPick",null),  // 직전에 끝낸 피킹 배치 (이동 내역 다시보기용)
+  pickHist:Store.get("pickHist",[]),    // 완료된 피킹 이력 — 서버와 무관하게 기기에 남습니다
+  sort:null,                 // 모드C {sku, name, lines[]}
+  queue:Store.get("queue",[]),      // 검수 결과 전송 대기
+  errQueue:Store.get("errq",[]),    // 오류 기록 전송 대기
+  plQueue:Store.get("plq",[]),      // 토탈 피킹 실적 전송 대기 (1줄=로케이션 1곳)
+  publishedBy:"", publishedAt:"",   // 누가 언제 올린 데이터인지
+  remoteSnap:null,                  // 서버의 최신 snapshot_id (새 데이터 감지용)
+  serverOk:null,                    // null=미확인, true/false
+  busy:false
+};
+
+/* ---------- 3. 유틸 ---------- */
+function uuid(){ if(crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0;return (c==="x"?r:(r&0x3|0x8)).toString(16)})}
+const norm=s=>String(s??"").trim().replace(/[\s\-]/g,"").toUpperCase();
+
+/* ── 스캐너가 붙이는 군더더기 제거 ──
+   일부 PDA 는 스캔값 앞뒤에 ~#a#~ 같은 표시를 붙여 보냅니다.
+   그대로 두면 "모르는 코드"로 튕기므로 읽기 전에 떼어냅니다.
+   ⚠️ 원문은 S.lastRaw 에 그대로 남겨 기록·표시에 씁니다. */
+function clean(raw){
+  let t=String(raw??"");
+  t=t.replace(/~#[^#~]*#~/g,"");        // ~#a#~ · ~#F1#~ 처럼 감싼 표시 (몇 번이든)
+  t=t.replace(/[\u0000-\u001F\u007F]/g,"");   // 제어문자
+  // 사용자가 설정에 적어둔 문자열도 제거 (쉼표로 여러 개)
+  String(CFG&&CFG.stripPat||"").split(",").forEach(x=>{
+    const v=x.trim(); if(!v)return;
+    try{ t=t.split(v).join("") }catch(e){}
+  });
+  t=t.trim().replace(/^[~#*\s]+|[~#*\s]+$/g,"");   // 남은 기호 껍데기
+  return t.trim();
+}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- 4. 사운드 ---------- */
+const Sound=(()=>{let ctx=null;
+  const ensure=()=>{try{ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==="suspended")ctx.resume()}catch(e){ctx=null}return ctx};
+  function beep(f,d,t="square",v=.22){if(!CFG.sound)return;const c=ensure();if(!c)return;
+    const o=c.createOscillator(),g=c.createGain();o.type=t;o.frequency.value=f;
+    o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(v,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+d);o.start();o.stop(c.currentTime+d)}
+  const vib=p=>{if(CFG.sound&&navigator.vibrate)try{navigator.vibrate(p)}catch(e){}};
+  return{unlock:ensure,
+    hit(){beep(1400,.07);vib(25)},
+    step(){beep(1000,.09,"triangle");vib(35)},
+    complete(){beep(880,.1);setTimeout(()=>beep(1320,.16),90);vib([40,50,40])},
+    error(){for(let i=0;i<3;i++)setTimeout(()=>beep(210,.22,"sawtooth",.35),i*260);vib([200,90,200,90,200])},
+    warn(){beep(500,.13,"triangle",.25);vib(80)}}})();
+
+let toastT;
+function toast(m,k=""){const t=$("toast");t.textContent=m;t.className="on "+k;
+  clearTimeout(toastT);toastT=setTimeout(()=>t.className="",1900)}
+
+/* =========================================================================
+ *  5. 스캐너 입력 — document 레벨. 히든 input 금지(포커스 유실 = 스캔 유실)
+ * ========================================================================= */
+(()=>{const GAP=60;let buf="",last=0,timer=null;
+  function flush(){const v=buf;buf="";$("buf").textContent="";if(v.length>=3)onScan(v)}
+  document.addEventListener("keydown",e=>{
+    const tag=(e.target.tagName||"").toLowerCase();
+    if(tag==="input"||tag==="textarea")return;
+    if($("pad").classList.contains("on"))return;      // 키패드 사용 중엔 스캔 무시
+    const now=Date.now(); if(now-last>GAP)buf=""; last=now;
+    if(e.key==="Enter"||e.key==="Tab"){e.preventDefault();clearTimeout(timer);flush();return}
+    if(e.key.length===1){buf+=e.key;$("buf").textContent=buf}
+    clearTimeout(timer);timer=setTimeout(flush,180);  // Enter 안 보내는 스캐너 대비
+  })})();
+
+/* ---------- 6. 상태 전이 ---------- */
+function setPhase(p){
+  S.phase=p;
+  $("hold").classList.toggle("on",p==="ERROR_HOLD");
+  if(p==="ERROR_HOLD")setTimeout(()=>{(CFG.pinOnError?$("pin"):$("holdOk")).focus()},60);
+  render();
+}
+function holdError(title,code,msg,ctx){
+  $("holdTitle").textContent=title;$("holdCode").textContent=code;
+  $("holdMsg").textContent=msg;$("pin").value="";
+  $("pinrow").style.display=CFG.pinOnError?"":"none";
+  $("holdOk").style.display=CFG.pinOnError?"none":"";
+  $("holdHint").textContent=CFG.pinOnError
+    ?"관리자 확인 후에만 해제할 수 있습니다"
+    :"확인을 누르면 이전 화면으로 돌아갑니다 · 오류는 자동 기록됩니다";
+  logError(title,code,msg,ctx);        // 모든 오류를 서버에 기록
+  Sound.error(); setPhase("ERROR_HOLD");
+}
+function clearHold(){
+  // 누가 해제했는지도 남긴다 (사후 추적용 — PIN 없이도 기록은 그대로)
+  const last=S.errQueue[S.errQueue.length-1];
+  if(last&&!last.resolved_by){last.resolved_by=CFG.worker||"미지정";Store.set("errq",S.errQueue);flushErrors()}
+  setPhase(S.mode==="A"?(S.cur?"ORDER_LOADED":"IDLE"):S.mode==="B"?"PICKING":S.mode==="C"?"SORTING":"IDLE");
+}
+$("holdOk").onclick=()=>{clearHold();toast("이전 화면으로 돌아갑니다")};
+$("pinOk").onclick=()=>{
+  if($("pin").value===String(CFG.pin)){$("pin").value="";clearHold();toast("해제되었습니다")}
+  else{Sound.warn();toast("PIN이 올바르지 않습니다","err");$("pin").value=""}};
+$("pin").addEventListener("keydown",e=>{if(e.key==="Enter"){e.stopPropagation();$("pinOk").click()}});
+
+/* =========================================================================
+ *  7. 스캔 라우팅 — 모드별 분기
+ * ========================================================================= */
+function onScan(raw){
+  Sound.unlock();
+  const orig=String(raw||"").trim();
+  const cut=clean(orig);                 // 스캐너가 붙인 ~#a#~ 등을 떼어냄
+  const code=norm(cut); if(!code)return;
+  if(cut!==orig&&!clean.warned){         // 한 번만 알려줍니다
+    clean.warned=true;
+    toast("스캐너 표시문자를 자동으로 제거했습니다","ok");
+  }
+  S.lastRaw=cut;                         // 화면·기록에는 정리된 값을 씁니다
+  if(S.phase==="ERROR_HOLD"){Sound.warn();toast("에러 해제 후 진행하세요","err");return}
+  if(!S.mode){Sound.warn();toast("먼저 모드를 선택하세요","err");return}
+  // 모드 B 는 WMS 피킹 리스트만으로도 동작하므로 주문 데이터를 요구하지 않습니다
+  const needOrders=(S.mode!=="B");
+  if(needOrders&&S.orders.size===0){Sound.warn();toast("출고 데이터를 먼저 불러오세요","err");return}
+  if(S.mode==="B"&&(!S.pick||!S.pick.lines.length)){Sound.warn();toast("피킹 리스트가 없습니다","err");return}
+  if(S.mode==="A")scanA(code);
+  else if(S.mode==="B")scanB(code);
+  else scanC(code);
+}
+
+/* ── 검수 완료 기록 ──
+   "무엇을 언제 누가 끝냈는지"를 기기에 남깁니다.
+   서버 전송과 별개로 보관하므로 오프라인에서도 진행 현황을 볼 수 있습니다. */
+function saveDone(){
+  // 7일 지난 기록은 정리 (무한정 쌓이면 저장소가 찹니다)
+  const cut=Date.now()-7*24*3600*1000;
+  const keep=Array.from(S.done.entries()).filter(([k,v])=>new Date(v.at).getTime()>cut);
+  S.done=new Map(keep); Store.set("done",keep);
+}
+
+/* ── 초기화 ──
+   누적 방지의 핵심. 데이터가 바뀌면 "완료 표시"는 반드시 같이 버려야 합니다.
+   안 그러면 어제 끝낸 송장이 오늘도 완료로 보여 실제로 안 싼 박스를 건너뜁니다. */
+function resetProgress(reason){
+  const n=S.done.size;
+  S.done=new Map(); S.progAt=""; S.boxCache=null;
+  S.cur=null; S.pick=null; S.sort=null;
+  Store.set("done",[]); Store.set("progAt","");
+  if(reason&&n)toast(`이전 진행상황 ${n}건을 초기화했습니다 · ${reason}`,"ok");
+  return n;
+}
+function resetData(){                 // 진행상황 + 적재된 출고/피킹 데이터까지
+  resetProgress();
+  Store.set("pick",null); Store.set("lastPick",null); S.lastPick=null;
+  S.orders=new Map(); S.aliasKeys=new Set(); S.rows=[];
+  S.wmsRows=[]; S.wmsAt=0; S.snapshotId=""; S.snapshotAt=0; S.doneSnap="";
+  S.publishedBy=""; S.publishedAt=""; S.remoteSnap=null;
+  Store.set("cache",null); Store.set("doneSnap","");
+  setPhase("IDLE");
+}
+/* 데이터가 교체될 때 자동으로 진행상황을 버린다 (사람이 잊어도 안전하게) */
+function syncDoneSnap(snapshotId){
+  if(!snapshotId)return;
+  if(S.doneSnap&&S.doneSnap!==snapshotId)resetProgress("새 데이터 적용");
+  S.doneSnap=snapshotId; Store.set("doneSnap",snapshotId);
+}
+const hhmm=iso=>{try{const d=new Date(iso);
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}catch(e){return ""}};
+const hhmmss=iso=>{try{const d=new Date(iso);
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`}catch(e){return ""}};
+const isDone=key=>S.done.has(key);
+
+/* ========================= 모드 A — 출고 검수 ========================= */
+function scanA(code){
+  const order=S.orders.get(code);
+  if(S.phase==="IDLE"||S.phase==="DONE"){
+    if(order){
+      const d=S.done.get(code);
+      if(d){                       // 이미 끝난 송장 — 다시 할지 물어봅니다
+        Sound.warn();
+        ask.confirm({title:"이미 검수된 송장입니다",danger:true,
+          yes:"다시 검수",no:"그만두기",
+          msg:`<b>${esc(String(code))}</b><br>완료 ${esc(hhmmss(d.at))} · ${esc(d.worker||"")}`+
+            (d.errors?`<br><span class="warn">오류 ${d.errors}회 발생</span>`:"")+
+            `<br><br>다시 검수하시겠습니까?`})
+          .then(yes=>{ if(yes)loadOrder(code) });
+        return;
+      }
+      return loadOrder(code);
+    }
+    return holdError("주문 없음",code,
+      "이 송장/주문번호가 현재 출고 데이터에 없습니다. 데이터가 오래되었거나 다른 배치일 수 있습니다.");
+  }
+  if(order&&code!==S.cur.key){
+    if(isCompleteA()){commitA();loadOrder(code)}
+    else{Sound.warn();toast("현재 주문이 미완료입니다","err")}
+    return;
+  }
+  const idx=matchLine(S.cur.lines,code);
+  if(idx<0){S.cur.errors++;
+    return holdError("리스트에 없는 상품",code,"이 주문에 포함되지 않은 상품입니다. 원위치하고 관리자를 호출하세요.")}
+  const l=S.cur.lines[idx];
+  if(l.got>=l.req){S.cur.errors++;
+    return holdError("수량 초과",code,`${l.product_name} — 주문 수량 ${l.req}개를 이미 채웠습니다.`)}
+  l.got++; l.flash=true; l.verified=true;
+  l.scans=l.scans||[]; l.scans.push(new Date().toISOString());   // 스캔 시각 기록
+  Sound.hit();
+  if(isCompleteA()){Sound.complete();setPhase("DONE");if(CFG.autoSubmit)setTimeout(commitA,700)}
+  else render();
+  setTimeout(()=>{l.flash=false},400);          // 다음 렌더에서 자연히 사라짐
+}
+function loadOrder(key){
+  const o=S.orders.get(key);
+  S.cur={key,order_no:o.order_no,invoice_no:o.invoice_no,
+    lines:o.lines.map(l=>({...l,req:l.qty,got:0,verified:false,flash:false})),
+    startedAt:new Date().toISOString(),errors:0,logId:uuid(),inputs:[]};
+  Sound.hit(); setPhase("ORDER_LOADED");
+}
+const isCompleteA=()=>!!S.cur&&S.cur.lines.every(l=>l.got>=l.req);
+
+/* ========================= 모드 B — 토탈 피킹 ========================= */
+/* WMS 토탈 피킹 리스트 적재 — 이 파일 하나로 모드 B가 완결됩니다.
+   로케이션·품목·가져올 수량이 이미 다 들어 있어 주문 데이터가 필요 없습니다. */
+/* 서버에서 받은 피킹 리스트를 그대로 적재 (엑셀 매핑 불필요) */
+function applyPick(list){
+  if(!list||!list.length)return 0;
+  const out=[];
+  list.forEach(r=>{
+    const req=Math.round(Number(r.qty_pick!==undefined?r.qty_pick:r.req)||0);
+    const bc=String(r.barcode||"").replace(/^'/,"").trim(),
+          loc=String(r.location_code||"").replace(/^'/,"").trim();
+    if(!bc||!loc||req<=0)return;
+    out.push({barcode:bc,location_code:loc,
+      sku_code:String(r.sku_code||"").trim()||bc,
+      product_name:String(r.product_name||bc).trim(),
+      cat:String(r.cat!==undefined&&r.cat!==null&&r.cat!==""?r.cat:(r["분류"]||"")).trim(),  // 서버는 시트 헤더 '분류'로 내려줌
+      zone:String(r.zone||"").trim(),
+      prio:Number(r.pick_priority!==undefined?r.pick_priority:r.prio)||0,
+      req, plan:Math.round(Number(r.qty_plan!==undefined?r.qty_plan:r.plan)||req)});
+  });
+  const stk=[];
+  list.forEach(r=>{
+    const bc=String(r.barcode||"").replace(/^'/,"").trim();
+    const lc=String(r.location_code||"").replace(/^'/,"").trim();
+    if(!bc||!lc)return;
+    stk.push({barcode:bc,location_code:lc,
+      qty:Math.round(Number(r.qty_pick!==undefined?r.qty_pick:r.req)||0),
+      product_name:String(r.product_name||bc).trim()});
+  });
+  S.stockRows=stk;
+  if(!out.length){ buildStockIdx(); return 0 }
+  S.pick=null; S.wmsRows=out; S.wmsAt=Date.now(); buildStockIdx();
+  return out.length;
+}
+
+/* 바코드 → 공급처(소화물·대화물·베이비룸…) 색인.
+   출고 파일에만 있는 정보라, 토탈 피킹 구역을 이 기준으로 나눌 수 있게 합니다. */
+
+/* ── 구역 나누기 ──
+   여러 명이 동시에 토탈 피킹을 할 때 같은 자리를 두 번 가지 않게,
+   피킹 리스트를 구역별로 쪼개 각자 맡은 곳만 보여줍니다.
+   규칙은 "이름=로케이션앞자리,앞자리" 형식. 예) 베이비룸=2A,2B  /  대화물=FA */
+/* 규칙이 없으면 로케이션 앞 2글자로 자동 그룹 (2A, 2B, FA …) */
+/* 현재 피킹 리스트를 구역별로 집계 */
+function zoneStats(){
+  /* 나누는 기준은 오직 "파일에 붙인 분류" 하나입니다.
+     예전에 있던 로케이션 앞자리·공급처 자동 분류는 분류와 충돌해 혼란만 줬으므로 없앴습니다. */
+  const m=new Map();
+  S.wmsRows.forEach(w=>{
+    const c=String(w.cat||"").trim(); if(!c)return;
+    if(!m.has(c))m.set(c,{name:c,n:0,qty:0});
+    const g=m.get(c); g.n++; g.qty+=w.req;
+  });
+  const none=S.wmsRows.filter(w=>!String(w.cat||"").trim());
+  const groups=Array.from(m.values());
+  if(none.length&&groups.length)groups.push({name:"(분류 없음)",n:none.length,
+    qty:none.reduce((a,w)=>a+w.req,0)});
+  return {by:"분류",groups};
+}
+
+/* 업로드한 데이터를 기기에 저장 — 서버 없이도 새로고침 후 그대로 남습니다 */
+function saveCache(){
+  try{
+    const loc=[]; S.locMap.forEach((arr,sku)=>arr.forEach(x=>loc.push(
+      {sku_code:sku,location_code:x.location_code,zone:x.zone,pick_priority:x.prio})));
+    const sku=[]; S.skuMaster.forEach((v,k)=>sku.push({barcode:k,sku_code:v}));
+    Store.set("cache",{rows:S.rows,loc,sku,pick:pickPayload(),
+      snapshot_id:S.snapshotId,by:S.publishedBy,at:S.publishedAt});
+  }catch(e){ toast("저장 공간이 부족합니다 — 오래된 이력을 정리하세요","err") }
+}
+
+/* ── 대체 로케이션 ──
+   지시된 로케이션에 물건이 없을 때 "같은 상품이 또 어디에 있는지" 알려줍니다.
+   출처: ① 업로드한 WMS 파일의 모든 줄(수량 0 포함) ② 로케이션 매핑 파일 */
+function buildStockIdx(){
+  const m=new Map();
+  const add=(bc,loc,qty,nm)=>{
+    const k=norm(bc); if(!k||!loc)return;
+    let a=m.get(k); if(!a){a=[];m.set(k,a)}
+    const hit=a.find(x=>norm(x.loc)===norm(loc));
+    if(hit){ if(qty>hit.qty)hit.qty=qty } else a.push({loc,qty:qty||0,name:nm||""});
+  };
+  (S.stockRows||[]).forEach(r=>add(r.barcode,r.location_code,r.qty,r.product_name));
+  (S.wmsRows||[]).forEach(r=>add(r.barcode,r.location_code,r.req,r.product_name));
+  S.locMap.forEach((arr,sku)=>arr.forEach(x=>add(sku,x.location_code,0,"")));
+  m.forEach(a=>a.sort((x,y)=>y.qty-x.qty));
+  S.stockIdx=m;
+}
+function altLocations(line){
+  const cur=norm(line.location_code);
+  const seen=new Set([cur]), out=[];
+  [norm(line.barcode),norm(line.sku_code)].forEach(k=>{
+    (S.stockIdx.get(k)||[]).forEach(x=>{
+      if(seen.has(norm(x.loc)))return; seen.add(norm(x.loc)); out.push(x);
+    });
+  });
+  return out;
+}
+
+async function ingestPick(rows,map,append,cat,onProg){
+  if(!append&&S.pick){S.pick=null;Store.set("pick",null);setPhase("IDLE")}  // 새 피킹리스트 → 진행 중 배치 폐기
+  /* 분류를 붙였다면 "그 분류만" 갈아끼웁니다.
+     대화물 파일을 다시 올려도 소화물·천일 분량은 그대로 남습니다.
+     ⚠ v1.2 버그수정: 이 파일에 분류를 "고르지 않은 경우"(cat==="")에도
+     똑같이 적용해야 합니다. 예전엔 cat이 비어 있으면 무조건 전체를 지우고
+     이 파일로 갈아치워서, 분류 없이 한 번만 올려도 그동안 나눠 올린
+     대화물·소화물 등이 전부 사라지고 그 뒤로는 "분류 선택" 화면 자체가
+     안 뜨는 문제(그룹이 1개만 남음)가 있었습니다.
+     → "이 파일의 분류"(빈 값 포함)와 다른 분류만 남기고, 같은 분류(빈 값끼리)만 교체합니다. */
+  let base=[];
+  if(append&&S.wmsRows)base=S.wmsRows.slice();
+  else if(S.wmsRows&&S.wmsRows.some(w=>String(w.cat||"")!==cat))
+    base=S.wmsRows.filter(w=>String(w.cat||"")!==cat);
+  const out=base;
+  const kept=base.length;
+  let skipped=0,zero=0,short=0,_j=0;
+  for(const r of rows){
+    if((++_j%500)===0){ if(onProg)onProg(_j,rows.length); await breathe() }
+    const barcode=String(val(r,map,"barcode")||"").trim();
+    const loc=String(val(r,map,"location_code")||"").trim();
+    const pick=Math.round(Number(val(r,map,"qty_pick"))||0);     // 정상수량 = 실제 가져올 수량
+    const plan=Math.round(Number(val(r,map,"qty_plan"))||0);     // 예정수량 = 참고값
+    if(!barcode||!loc){skipped++;continue}          // 합계행·빈행 제거
+    if(pick<=0){zero++;continue}                    // 가져올 수량이 0 인 줄은 대상 아님
+    if(plan!==pick)short++;                         // 예정과 확정이 다른 줄 (정보성)
+    out.push({barcode,location_code:loc,
+      sku_code:String(val(r,map,"sku_code")||"").trim()||barcode,
+      product_name:String(val(r,map,"product_name")||barcode).trim(),
+      zone:String(val(r,map,"zone")||"").trim(),
+      prio:Number(val(r,map,"pick_priority"))||0,
+      cat:cat||"",                     // ★ 이 파일의 분류 (대화물·소화물·천일…)
+      req:pick, plan});
+  }
+  S.wmsRows=out; S.wmsAt=Date.now();
+  // 수량 0 인 줄도 "그 상품이 그 로케이션에 있다"는 정보라 버리지 않고 색인해 둡니다
+  const stk=(append&&S.stockRows)?S.stockRows.slice():[];
+  for(const r of rows){
+    const bc=String(val(r,map,"barcode")||"").trim();
+    const lc=String(val(r,map,"location_code")||"").trim();
+    if(!bc||!lc)continue;
+    stk.push({barcode:bc,location_code:lc,
+      qty:Math.round(Number(val(r,map,"qty_pick"))||0),
+      product_name:String(val(r,map,"product_name")||bc).trim()});
+  }
+  S.stockRows=stk; buildStockIdx();
+  const totQ=out.reduce((a,x)=>a+x.req,0);
+  saveCache();                     // ★ 업로드 즉시 기기에 저장
+  toast(`${cat?cat+" · ":""}피킹 ${out.length-kept}줄 · 총 ${totQ}개 ${kept?"추가(기존 "+kept+"줄 유지)":(append?"추가":"적재")}`+
+        (zero?` · 수량0 ${zero}줄 제외`:"")+
+        (short?` · 예정과 다름 ${short}줄`:""),"ok");
+  render();
+}
+
+function buildPickList(zone){
+  /* ① WMS 토탈 피킹 리스트가 있으면 그대로 사용 */
+  if(S.wmsRows&&S.wmsRows.length){
+    let src=S.wmsRows;
+    if(zone&&zone!=="__ALL__"){
+      src=S.wmsRows.filter(w=>(String(w.cat||"").trim()||"(분류 없음)")===zone);
+      if(!src.length){ toast("그 분류에 피킹할 줄이 없습니다","err"); return }
+    }
+    const lines=src.map(w=>({
+      id:w.barcode+"@"+w.location_code,
+      location_code:w.location_code, zone:w.zone, prio:w.prio, cat:w.cat||"",
+      sku_code:w.sku_code, barcode:w.barcode,
+      product_name:w.product_name, option_name:"",
+      req:w.req, got:0, verified:false, plan:w.plan,
+      diff:(w.plan!==undefined&&w.plan!==w.req), orderCount:0, inputs:[],
+      step:"FROM", from_at:"", to_location:"", to_at:"", moved:false
+    }));
+    // 로케이션 코드 문자열 순서 = 창고 동선 (2A-01-01 → 2A-01-02 → 2B-… → FA-…)
+    // WMS 가 배정한 로케이션 순서를 그대로 따릅니다 (파일이 이미 동선 순).
+    lines.sort((x,y)=>(x.prio-y.prio)||
+      String(x.location_code).localeCompare(String(y.location_code),"en",{numeric:true}));
+    S.pick={batchId:uuid(),lines,idx:0,startedAt:new Date().toISOString(),errors:0,
+            src:"WMS",three:CFG.threeStep,zone:(zone&&zone!=="__ALL__")?zone:""};
+    savePick(); setPhase("PICKING"); return;
+  }
+  /* ② 없으면 출고 데이터 + 로케이션 매핑으로 직접 만듦 */
+  const agg=new Map();
+  for(const r of S.rows){
+    const k=r.sku_code;
+    if(!agg.has(k))agg.set(k,{sku_code:k,barcode:r.barcode,product_name:r.product_name,
+      option_name:r.option_name,qty:0,orders:new Set()});
+    const a=agg.get(k); a.qty+=r.qty; a.orders.add(r.order_no);
+  }
+  const lines=[];
+  for(const a of agg.values()){
+    const locs=S.locMap.get(norm(a.sku_code))||[{location_code:"미지정",zone:"",prio:9999}];
+    // v0.3: 로케이션이 여러 곳이어도 대표 1곳에 전량 배정.
+    //       재고 분산 할당은 v0.2 ALLOCATION 엔진(서버) 영역.
+    const L=locs[0];
+    lines.push({id:a.sku_code+"@"+L.location_code,
+      location_code:L.location_code,zone:L.zone,prio:Number(L.prio||9999),
+      sku_code:a.sku_code,barcode:a.barcode,product_name:a.product_name,
+      option_name:a.option_name,req:a.qty,got:0,verified:false,
+      orderCount:a.orders.size,inputs:[],
+      step:"FROM",from_at:"",to_location:"",to_at:"",moved:false});
+  }
+  lines.sort((x,y)=>x.prio-y.prio||String(x.location_code).localeCompare(y.location_code));
+  S.pick={batchId:uuid(),lines,idx:0,startedAt:new Date().toISOString(),errors:0,
+          src:"ORDERS",three:CFG.threeStep};
+  setPhase("PICKING");
+}
+function curPickLine(){ return S.pick?S.pick.lines[S.pick.idx]:null }
+
+/* ── 모드 B 스캔 ──
+   3단계 검증 모드(기본):
+     ① 출발 로케이션 스캔 — 내가 지금 그 자리에 있는지 확인
+     ② 상품 스캔 — 그 자리에서 이 상품을 집었는지 확인
+     ③ 도착 로케이션 스캔 — 제자리에 두면 같은 코드, 옮기면 새 코드
+   ③에서 다른 코드가 들어오면 "이동"으로 기록되어 WMS 반영 대상이 됩니다. */
+const isLocCode=(P,code)=>P.lines.some(l=>norm(l.location_code)===code);
+
+function scanB(code){
+  const P=S.pick; if(!P)return;
+  if(!P.three)return scanBsimple(code);
+
+  const line=curPickLine();
+  const step=line?line.step:"FROM";
+
+  /* ── ① 출발 로케이션 ── */
+  if(step==="FROM"){
+    const li=P.lines.findIndex(l=>norm(l.location_code)===code&&l.step!=="DONE");
+    if(li>=0){
+      P.idx=li;
+      const L=P.lines[li];
+      L.step="ITEM"; L.from_at=new Date().toISOString(); savePick();
+      Sound.step(); toast(`${L.location_code} 확인 · 상품을 스캔하세요`,"ok");
+      render(); return;
+    }
+    if(isLocCode(P,code)){Sound.warn();toast("이미 끝난 로케이션입니다");return}
+    // 상품을 먼저 쐈다면 그 상품의 로케이션으로 안내
+    const c=P.lines.filter(l=>matchOne(l,code)&&l.step!=="DONE");
+    if(c.length){Sound.warn();
+      toast(`먼저 로케이션 ${c[0].location_code} 을 스캔하세요`,"err");return}
+    // 현재 줄 상품이 실제로 있는 다른 자리라면 → 대체 로케이션으로 인정
+    if(line&&altLocations(line).some(x=>norm(x.loc)===code)){
+      useAlt(line,S.lastRaw||code); return;
+    }
+    P.errors++;
+    return holdError("모르는 로케이션",code,
+      "오늘 피킹 대상 로케이션이 아닙니다. 다른 자리에서 가져왔다면 [🔍 재고 없음] 을 눌러 고르세요.",
+      {sku_code:""});
+  }
+
+  /* ── ② 상품 ── */
+  if(step==="ITEM"){
+    if(isLocCode(P,code)){
+      if(norm(line.location_code)===code){Sound.warn();
+        toast("상품을 먼저 스캔하세요","err");return}
+      // 다른 로케이션으로 이동하려는 경우 — 현재 줄을 되돌림
+      line.step="FROM"; line.from_at="";
+      Sound.warn(); toast("현재 로케이션을 벗어났습니다","err");
+      render(); return scanB(code);
+    }
+    if(!matchOne(line,code)){
+      P.errors++;
+      return holdError("이 자리 상품이 아닙니다",code,
+        `${line.location_code} 에는 [${line.product_name}] 이 있어야 합니다. 원위치하고 확인하세요.`,
+        {sku_code:line.sku_code});
+    }
+    if(line.got>=line.req){P.errors++;
+      return holdError("수량 초과",code,
+        `${line.product_name} — 필요 수량 ${line.req}개를 이미 채웠습니다.`,
+        {sku_code:line.sku_code})}
+    line.verified=true; line.got++; line.flash=true; line.inputs.push("SCAN");
+    line.scans=line.scans||[]; line.scans.push(new Date().toISOString());
+    Sound.hit();
+    if(line.got>=line.req){ line.step="TO"; Sound.complete();
+      toast("가져올 수량 완료 · 둘 위치를 스캔하세요","ok") }
+    render();
+    setTimeout(()=>{line.flash=false;
+      const el=document.querySelector("#main .line.hit"); if(el)el.classList.remove("hit")},380);
+    return;
+  }
+
+  /* ── ③ 도착 로케이션 ── */
+  if(step==="TO"){
+    if(matchOne(line,code)){Sound.warn();
+      toast("수량 완료 · [출고 담기] 를 누르거나 옮길 위치를 스캔하세요","err");return}
+    finishLine(line,code,false);
+    return;
+  }
+}
+
+/** ③ 처리 확정
+    · 출고 카트/집품대로 가져감  → dest="출고"   (정상 출고 피킹, 기본)
+    · 다른 로케이션 코드를 스캔  → dest=그 코드  (재고 이동으로 기록)
+    · 원래 로케이션을 다시 스캔  → dest=제자리   (가져가지 않고 그대로 둠) */
+function finishLine(line,toCode,asShip){
+  const P=S.pick;
+  if(asShip){ line.to_location=line.location_code; line.moved=false; line.kept=true; line.shipped=true }
+  else{
+    // 표시는 원문(하이픈 포함)으로, 비교는 정규화 값으로
+    const known=(S.pick.lines.filter(l=>norm(l.location_code)===norm(toCode))[0]||{}).location_code;
+    line.to_location=known||S.lastRaw||toCode||"출고";
+    line.moved=!!toCode&&norm(toCode)!==norm(line.location_code);
+    line.kept=!!toCode&&norm(toCode)===norm(line.location_code);
+  }
+  line.to_at=new Date().toISOString();
+  line.step="DONE"; savePick();
+  Sound.complete();
+  if(line.moved)toast(`이동 기록 · ${line.location_code} → ${line.to_location}`,"ok");
+  const next=P.lines.findIndex(l=>l.step!=="DONE");
+  if(next>=0){P.idx=next;
+    if(!line.moved)toast(`${line.shipped?"출고 담기":"제자리"} 완료 · 다음 → ${P.lines[next].location_code}`,"ok")}
+  else{setPhase("DONE");render();return}
+  render();
+}
+window.shipLine=()=>{const l=curPickLine(); if(l&&l.step==="TO")finishLine(l,null,true)};
+
+/* 재고 없음 → 다른 로케이션에서 가져오기 */
+function openAlt(){
+  const l=curPickLine(); if(!l)return;
+  const cand=altLocations(l);
+  $("altSub").textContent=`${l.product_name} · 지시 ${l.location_code} · ${l.req}개 필요`;
+  $("altBody").innerHTML=cand.length
+    ? cand.map((x,i)=>`<button class="altbtn" data-i="${i}">
+        <span class="al">${esc(x.loc)}</span>
+        <span class="aq">${x.qty>0?`정상 <b>${x.qty}</b>개`:"수량 정보 없음"}</span></button>`).join("")
+      +`<p class="hint" style="margin-top:12px">여기에 없다면 실제 자리를 스캔해도 됩니다.
+         스캔한 자리는 그대로 <b>대체</b>로 기록됩니다.</p>`
+    : `<p class="hint">이 상품이 등록된 다른 로케이션이 없습니다.<br>
+       WMS 파일을 <b>정상재고 전체</b>로 다시 올리면 더 정확해집니다.<br><br>
+       실제 자리를 직접 스캔하면 그 자리가 대체로 기록됩니다.</p>`;
+  document.querySelectorAll("#altBody .altbtn").forEach(b=>b.onclick=()=>{
+    useAlt(l,cand[+b.dataset.i].loc); $("alt").classList.remove("on");
+  });
+  $("alt").classList.add("on");
+}
+window.openAlt=openAlt;
+$("altClose").onclick=()=>$("alt").classList.remove("on");
+/* 대체 로케이션 확정 — 원래 지시 자리는 보존해서 기록에 남깁니다 */
+function useAlt(line,loc){
+  if(!loc)return;
+  if(!line.orig_location)line.orig_location=line.location_code;
+  line.location_code=loc; line.substituted=true;
+  if(line.step==="FROM"){ line.step="ITEM"; line.from_at=new Date().toISOString() }
+  savePick(); Sound.step();
+  toast(`대체 로케이션 ${loc} 에서 피킹합니다 · 원래 ${line.orig_location}`,"ok");
+  render();
+}
+window.useAlt=useAlt;
+
+/* 3단계를 끄면 예전처럼 상품만 스캔하는 방식으로 동작합니다 */
+function scanBsimple(code){
+  const P=S.pick;
+  const li=P.lines.findIndex(l=>norm(l.location_code)===code);
+  if(li>=0){
+    if(P.lines[li].got>=P.lines[li].req){Sound.warn();toast("이미 완료된 로케이션입니다");return}
+    P.idx=li; Sound.step(); render(); return;
+  }
+  const line=curPickLine();
+  const hitCur=line&&matchOne(line,code);
+  if(!hitCur){
+    const cands=P.lines.map((l,i)=>({l,i})).filter(x=>matchOne(x.l,code)&&x.l.got<x.l.req);
+    if(cands.length===1){P.idx=cands[0].i;Sound.step();return scanBsimple(code)}
+    if(cands.length>1){Sound.warn();
+      toast("이 상품은 여러 로케이션에 있습니다. 로케이션을 먼저 스캔하세요","err");return}
+    P.errors++;
+    return holdError("피킹 리스트에 없는 상품",code,
+      "오늘 대상이 아닌 상품입니다. 원위치하고 관리자를 호출하세요.");
+  }
+  if(line.got>=line.req){P.errors++;
+    return holdError("수량 초과",code,`${line.product_name} — 필요 수량 ${line.req}개를 이미 채웠습니다.`)}
+  line.verified=true;
+  line.got++; line.flash=true; line.inputs.push("SCAN");
+  line.scans=line.scans||[]; line.scans.push(new Date().toISOString());
+  Sound.hit();
+  afterPickChange(line);
+}
+function afterPickChange(line){
+  const P=S.pick; savePick();
+  if(line.got>=line.req){
+    Sound.complete();
+    if(P.three){ line.step="TO"; toast("수량 완료 · 처리 방법을 선택하세요","ok"); render(); return }
+    const next=P.lines.findIndex(l=>l.got<l.req);
+    if(next>=0){P.idx=next; toast("다음 로케이션 → "+P.lines[next].location_code,"ok")}
+    else{setPhase("DONE");commitB();return}
+  }
+  render();
+  // 애니메이션만 끄면 되므로 전체 재렌더 대신 클래스만 제거합니다 (PDA 부담 감소)
+  setTimeout(()=>{line.flash=false;
+    const el=document.querySelector("#main .line.hit"); if(el)el.classList.remove("hit");
+  },380);
+}
+
+/* ========================= 모드 C — 분배 (DAS) ========================= */
+function scanC(code){
+  // 1) 상품 스캔 → 그 상품이 필요한 주문 목록 열기
+  const sku=resolveSku(code);
+  if(sku){
+    const lines=[];
+    for(const r of S.rows){
+      if(norm(r.sku_code)!==norm(sku))continue;
+      const key=norm(r.invoice_no||r.order_no);
+      const prev=S.sort&&S.sort.sku===sku?
+        (S.sort.lines.find(x=>x.key===key)||{}).got:undefined;
+      const ex=lines.find(x=>x.key===key);
+      if(ex)ex.req+=r.qty;
+      else lines.push({key,order_no:r.order_no,invoice_no:r.invoice_no,
+        receiver:r.receiver,shop:r.shop,req:r.qty,got:prev||0});
+    }
+    const meta=S.rows.find(r=>norm(r.sku_code)===norm(sku))||{};
+    S.sort={sku,name:meta.product_name||sku,option:meta.option_name||"",
+      lines,logId:uuid(),startedAt:new Date().toISOString(),errors:0};
+    Sound.step(); setPhase("SORTING"); return;
+  }
+  // 2) 주문/송장 스캔 → 배분
+  if(!S.sort){Sound.warn();toast("먼저 상품 바코드를 스캔하세요","err");return}
+  const t=S.sort.lines.find(l=>l.key===code);
+  if(!t){S.sort.errors++;
+    return holdError("이 상품이 필요 없는 주문",code,
+      `${S.sort.name} — 이 주문에는 포함되지 않은 상품입니다.`)}
+  if(t.got>=t.req){S.sort.errors++;
+    return holdError("배분 수량 초과",code,
+      `${t.invoice_no||t.order_no} — 이미 ${t.req}개를 배분했습니다.`)}
+  t.got++; t.flash=true; t.at=new Date().toISOString(); Sound.hit();
+  if(S.sort.lines.every(l=>l.got>=l.req)){Sound.complete();commitC()}
+  else render();
+  setTimeout(()=>{t.flash=false;
+    const el=document.querySelector("#main .line.hit"); if(el)el.classList.remove("hit");
+  },380);
+}
+
+/* ---------- 8. 매칭 헬퍼 ---------- */
+function matchOne(l,code){
+  if(norm(l.barcode)===code)return true;
+  if(norm(l.sku_code)===code)return true;
+  const s=S.skuMaster.get(code);
+  return !!s&&norm(s)===norm(l.sku_code);
+}
+function matchLine(lines,code){ return lines.findIndex(l=>matchOne(l,code)) }
+function resolveSku(code){
+  const m=S.skuMaster.get(code); if(m)return m;
+  const r=S.rows.find(r=>norm(r.barcode)===code||norm(r.sku_code)===code);
+  return r?r.sku_code:null;
+}
+
+/* =========================================================================
+ *  9. 수량 직접 입력 (키패드)
+ *     ★ 안전 설계: 품목 바코드를 1회 스캔해 "무엇인지" 검증한 뒤에만 열린다.
+ *       (설정에서 강제 해제 가능하나 기본 OFF)
+ * ========================================================================= */
+let padCtx=null;
+function openPad(ctx){
+  padCtx=ctx; padCtx.val="";
+  $("padTtl").textContent=ctx.title;
+  $("padItem").textContent=ctx.item;
+  $("padDisp").textContent="0";
+  updPadLim();
+  $("pad").classList.add("on");
+}
+function updPadLim(){
+  const v=Number(padCtx.val||0),max=padCtx.max;
+  $("padDisp").textContent=padCtx.val||"0";
+  const over=v>max;
+  $("padLim").textContent=over?`최대 ${max}개까지만 가능합니다`:`남은 수량 ${max}개`;
+  $("padLim").className="lim"+(over?" over":"");
+  $("padOk").disabled=(v<=0||over);
+}
+document.querySelectorAll(".keys button").forEach(b=>b.onclick=()=>{
+  const k=b.dataset.k;
+  if(k==="C")padCtx.val="";
+  else if(k==="←")padCtx.val=padCtx.val.slice(0,-1);
+  else if(padCtx.val.length<4)padCtx.val=(padCtx.val+k).replace(/^0+/,"");
+  updPadLim();
+});
+$("padCancel").onclick=()=>{$("pad").classList.remove("on");padCtx=null};
+$("padOk").onclick=()=>{
+  const v=Number(padCtx.val||0); if(v<=0||v>padCtx.max)return;
+  $("pad").classList.remove("on");
+  padCtx.apply(v); padCtx=null;
+};
+
+function openQtyPadB(){
+  const l=curPickLine(); if(!l)return;
+  if(!CFG.allowQtyOnly&&!l.verified){
+    Sound.warn(); toast("먼저 상품 바코드를 1회 스캔해 품목을 확인하세요","err"); return;
+  }
+  openPad({title:"피킹 수량 입력",item:l.product_name+(l.option_name?" · "+l.option_name:""),
+    max:l.req-l.got,
+    apply(v){ l.got+=v; l.inputs.push("MANUAL:"+v); l.flash=true;
+      l.scans=l.scans||[]; l.scans.push(new Date().toISOString());
+      Sound.step(); afterPickChange(l); }});
+}
+/* 모드 A — 한 개씩 스캔 + 수량 한 번에 입력, 둘 다 씁니다.
+   품목이 여러 종이면 "이미 1회 스캔해 확인된 품목"만 대상이라 오출고가 막힙니다. */
+async function openQtyPadA(idx){
+  if(!S.cur)return;
+  const cand=S.cur.lines.filter(l=>l.got<l.req&&(CFG.allowQtyOnly||l.got>0||S.cur.lines.length===1));
+  let l=(idx!==undefined)?S.cur.lines[idx]:(cand.length===1?cand[0]:null);
+  if(!l){
+    if(!cand.length){ Sound.warn();
+      toast("먼저 상품 바코드를 1회 스캔해 품목을 확인하세요","err"); return; }
+    // 후보가 여러 개면 고르게 한다
+    const iv=await ask.pick({title:"어느 품목인가요?",
+      options:cand.map((x,i)=>({v:String(i),label:x.product_name,
+        sub:(x.req-x.got)+"개 남음 · "+(x.barcode||x.sku_code)}))});
+    if(iv===null)return;
+    l=cand[+iv];
+  }
+  if(l.got>=l.req)return toast("이미 다 채워진 품목입니다","err");
+  openPad({title:"검수 수량 입력",item:l.product_name+(l.option_name?" · "+l.option_name:""),
+    max:l.req-l.got,
+    apply(v){ l.got+=v; l.flash=true;
+      l.scans=l.scans||[]; for(let i=0;i<v;i++)l.scans.push(new Date().toISOString());
+      l.inputs=l.inputs||[]; l.inputs.push("MANUAL:"+v);
+      Sound.step();
+      if(isCompleteA()){Sound.complete();setPhase("DONE");if(CFG.autoSubmit)setTimeout(commitA,700)}
+      else render(); }});
+}
+window.openQtyPadA=openQtyPadA;
+
+function openQtyPadC(t){
+  if(!CFG.allowQtyOnly&&!S.sort)return;
+  openPad({title:"배분 수량 입력",item:(t.invoice_no||t.order_no)+" · "+S.sort.name,
+    max:t.req-t.got,
+    apply(v){ t.got+=v; Sound.step();
+      if(S.sort.lines.every(l=>l.got>=l.req)){Sound.complete();commitC()} else render(); }});
+}
+
+/* =========================================================================
+ *  10. 커밋 (오프라인 큐 + 멱등키)
+ * ========================================================================= */
+function push(rec){
+  S.queue.push(rec); Store.set("queue",S.queue);
+  renderQueue(); flushQueue();
+}
+function commitA(){
+  if(!S.cur)return;
+  const now=new Date().toISOString();
+  const lines=S.cur.lines.map(l=>({
+    sku:l.sku_code, barcode:l.barcode, name:l.product_name,
+    req:l.req, got:l.got,
+    first_at:(l.scans&&l.scans[0])||"", last_at:(l.scans&&l.scans[l.scans.length-1])||"",
+    scans:(l.scans||[])
+  }));
+  push({log_id:S.cur.logId,type:"INSPECT",
+    order_no:S.cur.order_no,invoice_no:S.cur.invoice_no,
+    worker:CFG.worker||"미지정",device_id:CFG.deviceId,snapshot_id:S.snapshotId,
+    started_at:S.cur.startedAt,finished_at:now,
+    result:S.cur.errors>0?"OK_WITH_ERROR":"OK",error_count:S.cur.errors,
+    scanned_json:JSON.stringify(lines)});
+  // 기기에도 남겨 진행 현황(완료/미완료)을 바로 볼 수 있게 합니다
+  S.done.set(S.cur.key,{at:now,started:S.cur.startedAt,
+    worker:CFG.worker||"미지정",errors:S.cur.errors,
+    invoice_no:S.cur.invoice_no,order_no:S.cur.order_no,
+    receiver:(S.orders.get(S.cur.key)||{}).receiver||"",
+    qty:S.cur.lines.reduce((a,l)=>a+l.req,0), lines});
+  saveDone(); S.boxCache=null;
+  S.cur=null; setPhase("IDLE");
+  toast(`검수 완료 · ${hhmmss(now)} 기록됨`,"ok");
+}
+/* ── 로케이션 이동 내역 ──
+   토탈 피킹이 끝나면 "무엇을 어디서 어디로 옮겼는지"를 한 화면에서 확인하고
+   그대로 WMS 에 입력할 수 있게 합니다. 피킹 중에도 언제든 볼 수 있습니다. */
+function pickLinesForReview(){
+  const P=S.pick||S.lastPick; return P?P.lines:[];
+}
+function openMove(){
+  const lines=pickLinesForReview();
+  if(!lines.length)return toast("피킹 내역이 없습니다","err");
+  const mv=lines.filter(l=>l.moved), kp=lines.filter(l=>l.kept&&!l.moved),
+        sh=lines.filter(l=>l.step==="DONE"&&!l.moved&&!l.kept),
+        no=lines.filter(l=>l.step!=="DONE"),
+        sub=lines.filter(l=>l.substituted);
+  $("mvSub").textContent=`이동 ${mv.length} · 제자리 ${kp.length}`+
+    (sh.length?` · 출고 ${sh.length}`:"")+
+    (sub.length?` · 대체 ${sub.length}`:"")+
+    (no.length?` · 미처리 ${no.length}`:"");
+  const row=(l,cls,tag,tagCls)=>`<div class="mvrow ${cls}">
+    <div class="mvn"><b>${esc(l.product_name)}${l.substituted?`<span class="subtag">대체</span>`:""}</b>
+      <div class="l">${l.substituted?`<s style="opacity:.5">${esc(l.orig_location)}</s> ⇢ `:""}${esc(l.location_code)}${l.moved?` <span style="color:#c4b5fd">→ ${esc(l.to_location)}</span>`:""}
+        · ${esc(l.barcode||l.sku_code)}</div></div>
+    <div class="mvq">${l.got}<span style="font-size:12px;opacity:.6">/${l.req}</span></div>
+    <span class="mvtag ${tagCls}">${tag}</span></div>`;
+  let h="";
+  if(mv.length)h+=`<div class="k" style="margin:2px 0 6px">WMS 에 입력할 이동 ${mv.length}건</div>`+
+    mv.map(l=>row(l,"move","이동","mo")).join("");
+  if(sub.length)h+=`<div class="k" style="margin:14px 0 6px">지시와 다른 자리에서 가져온 ${sub.length}건 (대체)</div>`+
+    sub.map(l=>row(l,"","대체","ke")).join("");
+  if(no.length)h+=`<div class="k" style="margin:14px 0 6px">아직 처리 안 된 ${no.length}건</div>`+
+    no.map(l=>row(l,"","미처리","no")).join("");
+  if(sh.length)h+=`<div class="k" style="margin:14px 0 6px">출고로 뺀 ${sh.length}건</div>`+
+    sh.map(l=>row(l,"","출고","sh")).join("");
+  if(kp.length)h+=`<div class="k" style="margin:14px 0 6px">제자리 유지 ${kp.length}건</div>`+
+    kp.map(l=>row(l,"","제자리","ke")).join("");
+  $("mvBody").innerHTML=h||`<p class="hint">표시할 내역이 없습니다</p>`;
+  $("mvCopy").disabled=!mv.length;
+  $("mvCopy").textContent=mv.length?`📋 이동 ${mv.length}건 복사`:"이동 없음";
+  $("mv").classList.add("on");
+}
+window.openMove=openMove;
+
+/* 📋 피킹 이력 화면 */
+function openHist(){
+  const H=S.pickHist;
+  const qty=H.reduce((a,h)=>a+h.qty,0), mv=H.reduce((a,h)=>a+h.moved,0);
+  const wait=H.filter(h=>!h.sent).length;
+  $("histSub").textContent=H.length
+    ? `${H.length}회 · ${qty}개 · 이동 ${mv}건`+(wait?` · 서버 미전송 ${wait}회`:" · 모두 전송됨")
+    : "아직 완료된 피킹이 없습니다";
+  $("histBody").innerHTML=H.length? H.map((h,i)=>{
+    const d=new Date(h.at);
+    const when=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    return `<div class="hcard">
+      <div class="ht"><div class="hd1">${when} · ${esc(h.worker)}${h.cat?` · <span style="color:#93c5fd">${esc(h.cat)}</span>`:""}</div>
+        <span class="senttag ${h.sent?"ok":"no"}">${h.sent?"서버 저장됨":"기기에만 있음"}</span></div>
+      <div class="hs">${h.n}줄 / ${h.qty}개 처리${h.total>h.n?` <span style="color:var(--warn)">· 미처리 ${h.total-h.n}줄</span>`:""}
+        ${h.moved?` · <b style="color:#c4b5fd">이동 ${h.moved}건</b>`:""}${h.sub?` · <b style="color:#fbbf24">대체 ${h.sub}건</b>`:""}</div>
+      <div class="hb">
+        <button onclick="histView(${i})">🚚 이동 내역</button>
+        <button onclick="histCopy(${i})">📋 이동분 복사</button>
+        <button onclick="histOne(${i})">⤓ CSV</button>
+        ${h.sent?"":`<button onclick="histSend(${i})" style="background:#1e3a5f;color:#93c5fd">↑ 재전송</button>`}
+      </div></div>`;
+  }).join("") : `<p class="hint">피킹을 완료하면 여기에 쌓입니다.</p>`;
+  $("histAll").disabled=!H.length;
+  $("hist").classList.add("on");
+}
+window.openHist=openHist;
+$("histClose").onclick=()=>$("hist").classList.remove("on");
+$("histAll").onclick=()=>{
+  if(!S.pickHist.length)return;
+  const n=histCsv(S.pickHist,"토탈피킹_전체");
+  toast(`전체 ${n}줄을 CSV 로 내려받았습니다`,"ok");
+};
+/* 이력 → 화면에 맞는 형태로 되돌려 이동 내역 화면 재사용 */
+function histToPick(h){
+  return {lines:h.lines.map(l=>({
+    location_code:l.loc, orig_location:l.orig, substituted:l.sub, zone:l.zone,
+    barcode:l.bc, sku_code:l.sku, product_name:l.name,
+    req:l.req, got:l.got, plan:l.plan, to_location:l.to,
+    moved:l.moved, kept:l.kind.indexOf("제자리")>=0, shipped:l.kind.indexOf("출고")>=0,
+    step:l.kind==="미처리"?"ITEM":"DONE",
+    from_at:l.from_at, to_at:l.to_at, scans:[l.first,l.last].filter(Boolean), inputs:(l.input||"").split("/")
+  })), three:h.three, batchId:h.batchId};
+}
+window.histView=i=>{ S.lastPick=histToPick(S.pickHist[i]); openMove() };
+window.histCopy=i=>{
+  S.lastPick=histToPick(S.pickHist[i]);
+  const t=moveText();
+  if(!t)return toast("이 배치에는 이동 건이 없습니다","err");
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(t).then(()=>toast("이동 내역을 복사했습니다","ok")).catch(()=>openMove());
+  else openMove();
+};
+window.histOne=i=>{ const n=histCsv([S.pickHist[i]],"토탈피킹"); toast(`${n}줄 CSV 저장`,"ok") };
+window.histSend=async i=>{
+  const h=S.pickHist[i];
+  if(!CFG.api)return toast("공유 서버 주소가 없습니다 — CSV 로 내보내세요","err");
+  pushPickLines(histToPick(h));
+  toast("재전송 중...","ok");
+  setTimeout(()=>{openHist()},2500);
+};
+window.resumePick=()=>{
+  if(!S.pick)return;
+  if(!CFG.worker.trim())return toast("작업자 이름을 먼저 입력하세요","err");
+  S.mode="B"; setPhase("PICKING");
+  toast("이어서 진행합니다","ok");
+};
+function moveText(){
+  return pickLinesForReview().filter(l=>l.moved)
+    .map(l=>[l.barcode||l.sku_code,l.location_code,l.to_location,l.got,
+             l.substituted?"대체(원래 "+l.orig_location+")":""].join("\t")).join("\n");
+}
+$("mvClose").onclick=()=>$("mv").classList.remove("on");
+$("mvCopy").onclick=()=>{
+  const t=moveText(); if(!t)return;
+  const done=okc=>toast(okc?"이동 내역을 복사했습니다 — WMS 에 붙여넣으세요":"복사 실패 — CSV 를 쓰세요",okc?"ok":"err");
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(t).then(()=>done(true)).catch(()=>done(false));
+  else done(false);
+};
+$("mvCsv").onclick=()=>exportPickCsv();
+
+/* ── 피킹 이력 ──
+   ★ 서버(구글시트)가 죽어 있어도 자료가 절대 사라지지 않게 하는 마지막 보루입니다.
+     완료 즉시 기기에 저장하고, 언제든 CSV 로 뽑아 WMS 에 반영할 수 있습니다. */
+function saveHist(P){
+  const lines=P.lines.filter(l=>l.step==="DONE"||l.got>0);
+  const rec={
+    batchId:P.batchId, at:new Date().toISOString(), worker:CFG.worker||"미지정",
+    n:lines.length, total:P.lines.length,
+    qty:lines.reduce((a,l)=>a+l.got,0),
+    moved:lines.filter(l=>l.moved).length,
+    sub:lines.filter(l=>l.substituted).length,
+    sent:false, three:!!P.three,
+    cat:P.zone||(lines[0]&&lines[0].cat)||"",
+    lines:lines.map(l=>({
+      loc:l.location_code, orig:l.orig_location||l.location_code, sub:!!l.substituted,
+      cat:l.cat||"", zone:l.zone||"", bc:l.barcode||"", sku:l.sku_code||"", name:l.product_name||"",
+      req:l.req, got:l.got, plan:(l.plan===undefined?l.req:l.plan),
+      kind:l.step!=="DONE"?"미처리":l.moved?"이동":l.shipped?"출고(제자리)":l.kept?"제자리":"출고",
+      to:l.to_location||"", moved:!!l.moved,
+      from_at:l.from_at||"", first:(l.scans&&l.scans[0])||"",
+      last:(l.scans&&l.scans[l.scans.length-1])||"", to_at:l.to_at||"",
+      input:(l.inputs||[]).join("/")
+    }))
+  };
+  S.pickHist.unshift(rec);
+  // 30일 또는 60배치까지 보관 (저장소 한도 대비)
+  const cut=Date.now()-30*24*3600*1000;
+  S.pickHist=S.pickHist.filter(h=>new Date(h.at).getTime()>cut).slice(0,60);
+  try{ Store.set("pickHist",S.pickHist) }
+  catch(e){ S.pickHist=S.pickHist.slice(0,20); Store.set("pickHist",S.pickHist) }
+  return rec;
+}
+function markHistSent(batchId){
+  const h=S.pickHist.find(x=>x.batchId===batchId);
+  if(h&&!h.sent){h.sent=true;Store.set("pickHist",S.pickHist)}
+}
+/* 이력 → CSV (한 배치 또는 전체) */
+function histCsv(list,prefix){
+  const rows=[["피킹일시","작업자","분류","배치","출발로케이션","지시로케이션","대체여부","구역",
+               "바코드","상품코드","상품명","확정수량","피킹수량","예정수량",
+               "처리","도착로케이션","이동여부","위치확인","첫스캔","마지막스캔","처리시각","입력방식"]];
+  list.forEach(h=>h.lines.forEach(l=>rows.push([
+    h.at.replace("T"," ").slice(0,19), h.worker, l.cat||h.cat||"", h.batchId.slice(0,8),
+    l.loc, l.orig, l.sub?"대체":"", l.zone,
+    l.bc, l.sku, l.name, l.req, l.got, l.plan,
+    l.kind, l.to, l.moved?"이동":"",
+    hhmmss(l.from_at), hhmmss(l.first), hhmmss(l.last), hhmmss(l.to_at), l.input])));
+  downloadCsv(rows,prefix);
+  return rows.length-1;
+}
+
+/* 진행 중인 피킹 배치를 기기에 저장 — 새로고침·전화·앱 종료에도 안 날아갑니다 */
+function savePick(){
+  try{ Store.set("pick", S.pick?{
+    batchId:S.pick.batchId, idx:S.pick.idx, three:S.pick.three,
+    startedAt:S.pick.startedAt, errors:S.pick.errors, at:Date.now(),
+    lines:S.pick.lines
+  }:null) }catch(e){}
+}
+function restorePick(){
+  const c=Store.get("pick",null);
+  if(!c||!c.lines||!c.lines.length)return false;
+  if(Date.now()-(c.at||0)>16*3600*1000){Store.set("pick",null);return false}  // 하루 지난 건 버림
+  S.pick=c; return true;
+}
+
+/* 토탈 피킹 실적을 "1줄 = 로케이션 1곳" 으로 펼쳐 서버에 보냅니다.
+   JSON 한 덩어리로 넣으면 구글시트에서 읽을 수가 없어 실무에 못 씁니다. */
+function pushPickLines(P){
+  const at=new Date().toISOString();
+  const rows=P.lines.filter(l=>l.step==="DONE"||l.got>0).map(l=>({
+    line_id:P.batchId+"#"+(l.barcode||l.sku_code||"")+"#"+norm(l.orig_location||l.location_code),
+    batch_id:P.batchId, worker:CFG.worker||"미지정", device_id:CFG.deviceId, at,
+    from:l.location_code, orig_from:l.orig_location||l.location_code, sub:!!l.substituted,
+    cat:l.cat||P.zone||"", zone:l.zone||"", barcode:l.barcode||"", sku:l.sku_code||"", name:l.product_name||"",
+    req:l.req, got:l.got, plan:(l.plan===undefined?l.req:l.plan),
+    kind:l.step!=="DONE"?"미처리":l.moved?"이동":l.shipped?"출고(제자리)":l.kept?"제자리":"출고",
+    to:l.to_location||"", moved:!!l.moved,
+    from_at:l.from_at||"", first_at:(l.scans&&l.scans[0])||"",
+    last_at:(l.scans&&l.scans[l.scans.length-1])||"", to_at:l.to_at||"",
+    input:(l.inputs||[]).join("/")
+  }));
+  if(!rows.length)return;
+  S.plQueue=S.plQueue.concat(rows); Store.set("plq",S.plQueue);
+  renderQueue(); flushPickLines();
+}
+async function flushPickLines(){
+  if(!S.plQueue.length||!CFG.api||!navigator.onLine)return;
+  const batch=S.plQueue.slice(0,300);
+  try{
+    const j=await api("pickcommit",{rows:batch});
+    if(j&&j.ok){
+      const ids=new Set(batch.map(r=>r.line_id));
+      S.plQueue=S.plQueue.filter(r=>!ids.has(r.line_id));
+      Store.set("plq",S.plQueue); renderQueue();
+      new Set(batch.map(r=>r.batch_id)).forEach(b=>{
+        if(!S.plQueue.some(r=>r.batch_id===b))markHistSent(b);
+      });
+      if(S.plQueue.length)setTimeout(flushPickLines,400);
+    }else if(j&&/unknown action/i.test(String(j.error||""))){
+      toast("피킹 실적 저장 실패 — 구글시트 Code.gs 를 v1.0 으로 올려주세요","err");
+    }
+  }catch(e){}
+}
+setInterval(()=>{ if(document.visibilityState==="visible")flushPickLines() },45000);
+window.addEventListener("online",()=>{flushPickLines()});
+
+function commitB(){
+  const P=S.pick; if(!P)return;
+  const manual=P.lines.filter(l=>l.inputs.some(i=>i.startsWith("MANUAL"))).length;
+  push({log_id:P.batchId,type:"PICK",
+    order_no:"",invoice_no:"",worker:CFG.worker||"미지정",device_id:CFG.deviceId,
+    snapshot_id:S.snapshotId,started_at:P.startedAt,finished_at:new Date().toISOString(),
+    result:P.errors>0?"OK_WITH_ERROR":"OK",error_count:P.errors,
+    scanned_json:JSON.stringify(P.lines.map(l=>({
+      from:l.location_code, to:l.to_location||"", moved:!!l.moved, kept:!!l.kept,
+      sub:!!l.substituted, orig_from:l.orig_location||"", shipped:!!l.shipped,
+      barcode:l.barcode, sku:l.sku_code, name:l.product_name,
+      req:l.req, got:l.got, stock:l.stock,
+      from_at:l.from_at||"", to_at:l.to_at||"",
+      first_at:(l.scans&&l.scans[0])||"", last_at:(l.scans&&l.scans[l.scans.length-1])||"",
+      input:l.inputs.join("/")})))});
+  saveHist(P);               // ★ 먼저 기기에 저장 — 서버가 죽어도 자료는 남습니다
+  pushPickLines(P);          // 그 다음 시트로 전송 (실패해도 위 기록은 유지)
+  const mv=P.lines.filter(l=>l.moved).length;
+  toast(`피킹 완료 · ${P.lines.length}개 로케이션`+(mv?` · 이동 ${mv}건`:"")+(manual?` · 수량입력 ${manual}건`:""),"ok");
+  S.lastPick=P;                       // 완료 후에도 이동 내역을 다시 볼 수 있게 보관
+  S.pick=null; Store.set("pick",null); Store.set("lastPick",P); setPhase("IDLE");
+  if(mv)setTimeout(openMove,350);     // 이동이 있었다면 바로 확인 화면을 띄운다
+}
+function commitC(){
+  const T=S.sort; if(!T)return;
+  push({log_id:T.logId,type:"SORT",order_no:"",invoice_no:"",
+    worker:CFG.worker||"미지정",device_id:CFG.deviceId,snapshot_id:S.snapshotId,
+    started_at:T.startedAt,finished_at:new Date().toISOString(),
+    result:T.errors>0?"OK_WITH_ERROR":"OK",error_count:T.errors,
+    scanned_json:JSON.stringify({sku:T.sku,lines:T.lines.map(l=>({o:l.invoice_no||l.order_no,req:l.req,got:l.got}))})});
+  toast(`${T.name} 분배 완료`,"ok");
+  S.sort=null; setPhase("SORTING");
+}
+
+async function flushQueue(){
+  if(!S.queue.length||!CFG.api||!navigator.onLine){renderQueue();return}
+  const batch=S.queue.slice(0,20);
+  try{
+    const res=await fetch(CFG.api,{method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"commit",rows:batch})});
+    const j=await res.json();
+    if(j.ok){const done=new Set(batch.map(b=>b.log_id));
+      S.queue=S.queue.filter(r=>!done.has(r.log_id));Store.set("queue",S.queue);
+      if(S.queue.length)setTimeout(flushQueue,300)}
+  }catch(e){}
+  renderQueue();
+}
+setInterval(()=>{ if(document.visibilityState==="visible")flushQueue() },30000);
+window.addEventListener("online",()=>{renderHeader();flushQueue()});
+window.addEventListener("offline",renderHeader);
+
+/* =========================================================================
+ *  11. 데이터 적재
+ * ========================================================================= */
+/* 필드 정의 — 라벨·필수여부·자동인식 후보.
+   실제 엑셀 헤더가 뭐든 화면에서 직접 매핑할 수 있으므로 여기 없어도 동작합니다. */
+const FIELDS=[
+  /* ── WMS 토탈 피킹 리스트 전용 ── */
+  /* ⚠ WMS 파일에서 실제로 가져와야 할 수량은 "정상수량"(확정) 입니다.
+     "예정수량"은 원래 계획값이라 확정과 다를 수 있고, 예정 0 인데 정상 4 인 줄도 있습니다.
+     예정수량으로 피킹하면 가져와야 할 물건을 통째로 빠뜨립니다. */
+  {k:"qty_pick",     n:"피킹수량",   req:1, kind:"pick",   a:["정상수량","확정수량","피킹수량","실수량","qty_pick"]},
+  {k:"qty_plan",     n:"예정수량",   req:0, kind:"pick",   a:["예정수량","출고예정수량","예정","qty_plan"]},
+
+  /* ⚠ 송장번호가 1순위입니다.
+     실제 데이터에서 같은 주문번호가 송장 15개로 쪼개진 건이 있어,
+     주문번호로 묶으면 15박스 물건이 한 화면에 뭉쳐 나옵니다. */
+  {k:"invoice_no",   n:"송장번호",   req:1, kind:"orders", a:["송장번호","운송장번호","송장 번호","운송장","invoice_no","invoice","송장"]},
+  {k:"order_no",     n:"주문번호",   req:0, kind:"orders", a:["주문번호","오더번호","주문No","주문 번호","order_no","orderno","주문코드"]},
+  {k:"mgmt_no",      n:"관리번호",   req:0, kind:"orders", a:["관리번호","합포번호","출고번호","관리 번호","mgmt_no"]},
+  {k:"barcode",      n:"바코드",     req:1, kind:"orders", a:["바코드","바코드번호","barcode","ean","jan"]},
+  {k:"sku_code",     n:"상품코드",   req:0, kind:"both",   a:["상품코드","자체상품코드","자체품번","품번","품목코드","sku","sku_code","상품 코드"]},
+  {k:"product_name", n:"상품명",     req:0, kind:"orders", a:["상품명","제품명","품목명","product_name","상품 명"]},
+  {k:"option_name",  n:"옵션명",     req:0, kind:"orders", a:["옵션","옵션명","옵션정보","option","option_name","선택옵션"]},
+  /* ⚠ "상품수량"이 먼저입니다.
+     세트상품은 주문수량 6 인데 실제로 담아야 할 상품수량이 12 인 경우가 있습니다.
+     주문수량으로 검수하면 절반만 넣고 완료 처리됩니다. */
+  {k:"qty",          n:"검수수량",   req:1, kind:"orders", a:["상품수량","실제수량","출고수량","수량","주문수량","qty","quantity","개수"]},
+  {k:"qty_order",    n:"주문수량",   req:0, kind:"orders", a:["주문수량","오더수량"]},
+  {k:"status",       n:"상태",       req:0, kind:"orders", a:["상태","진행상태","status"]},
+  {k:"receiver",     n:"수취인",     req:0, kind:"orders", a:["수령자이름","수취인","수령인","받는분","수취인명","수취인이름","수령자","receiver","고객명"]},
+  {k:"shop",         n:"판매처",     req:0, kind:"orders", a:["판매처","쇼핑몰","마켓","채널","shop","mall"]},
+  {k:"supplier",     n:"공급처/구역", req:0, kind:"orders", a:["공급처","출고처","화주","창고구역","공급 처","supplier"]},
+  {k:"courier",      n:"택배사",     req:0, kind:"orders", a:["택배사","배송사","courier"]},
+  {k:"memo",         n:"배송메모",   req:0, kind:"orders", a:["배송메시지","배송메모","메모","요청사항","memo"]},
+  {k:"location_code",n:"로케이션",   req:0, kind:"both",   a:["정상다중로케이션","다중로케이션","로케이션","위치","적재위치","보관위치","셀","location","location_code","loc"]},
+  {k:"zone",         n:"구역",       req:0, kind:"both",   a:["구역","존","zone","area"]},
+  {k:"pick_priority",n:"피킹순서",   req:0, kind:"both",   a:["피킹순서","동선","동선순서","우선순위","순번","pick_priority","prio","seq"]}
+];
+const F_=k=>FIELDS.filter(f=>f.k===k)[0];
+/** 파일 종류별로 화면에 보여줄 필드 목록 (순서 = 화면 순서) */
+function fieldsFor(kind){
+  if(kind==="pick"){          // WMS 토탈 피킹 리스트 — 이 파일 하나로 모드 B 완결
+    return [
+      {...F_("barcode"),      req:1},
+      {...F_("product_name"), req:0},
+      {...F_("location_code"),req:1},
+      {...F_("qty_pick"),     req:1},
+      {...F_("qty_plan"),     req:0},
+      {...F_("sku_code"),     req:0},
+      {...F_("zone"),         req:0},
+      {...F_("pick_priority"),req:0}
+    ];
+  }
+  if(kind==="loc")
+    return ["sku_code","location_code","zone","pick_priority"].map(k=>({...F_(k),req:k==="sku_code"||k==="location_code"?1:0}));
+  return FIELDS.filter(f=>f.kind==="both"||f.kind==="orders");
+}
+
+const flatKey=s=>String(s).trim().toLowerCase().replace(/[\s_\-().]/g,"");
+/** 헤더 자동 인식: 완전일치 → 부분포함
+ *  ⚠ 반드시 "후보 목록 순서"로 돌아야 합니다.
+ *  헤더 순서로 돌면 엑셀에 [주문수량, 상품수량] 이 있을 때 앞에 있는
+ *  주문수량이 잡혀 버립니다. 세트상품 수량이 절반으로 검수되던 원인이었습니다. */
+function guessCol(field,headers){
+  const flat=headers.map(flatKey);
+  for(var i=0;i<field.a.length;i++){                 // 후보를 적어둔 순서대로
+    var k=flatKey(field.a[i]), j=flat.indexOf(k);
+    if(j>=0)return headers[j];                       // 완전일치 우선
+  }
+  for(var i2=0;i2<field.a.length;i2++){
+    var k2=flatKey(field.a[i2]); if(k2.length<3)continue;
+    for(var j2=0;j2<flat.length;j2++){
+      // ⚠ 양쪽 모두 3글자 이상일 때만 부분매칭.
+      //   이 조건이 없으면 행번호 컬럼 "No" 가 "mgmt_no" 에 걸려
+      //   관리번호로 둔갑하고, 숫자 "1" 만 입력해도 주문이 조회됩니다.
+      if(flat[j2].length<3)continue;
+      if(flat[j2].indexOf(k2)>=0||k2.indexOf(flat[j2])>=0)return headers[j2];
+    }
+  }
+  return "";
+}
+function autoMap(headers,kind){
+  const m={};
+  fieldsFor(kind).forEach(f=>{const g=guessCol(f,headers); if(g)m[f.k]=g});
+  return m;
+}
+const val=(row,map,k)=>{const c=map[k]; return c===undefined?"":(row[c]??"")};
+
+async function ingest(rows,snapshotId,map,append,onProg){
+  if(!append)syncDoneSnap(snapshotId);      // 데이터 교체 → 완료표시도 교체
+  const orders=append?S.orders:new Map();
+  const flat=append?S.rows.slice():[];
+  let skipped=0, added=0;
+  const aliasHits=new Map();   // 보조번호(주문번호·관리번호) → 어떤 송장들에 걸리는지
+
+  let _i=0;
+  for(const r of rows){
+    // 500행마다 화면에 숨 쉴 틈을 줍니다 (진행률 표시 + 터치 반응 유지)
+    if((++_i%500)===0){ if(onProg)onProg(_i,rows.length); await breathe() }
+    const invoice_no=String(val(r,map,"invoice_no")||"").trim();
+    const order_no=String(val(r,map,"order_no")||"").trim();
+    const mgmt_no=String(val(r,map,"mgmt_no")||"").trim();
+    const barcode=String(val(r,map,"barcode")||"").trim();
+    const sku_code=String(val(r,map,"sku_code")||"").trim()||barcode;
+    const qty=parseInt(val(r,map,"qty"),10)||0;
+    if((!invoice_no&&!order_no)||(!barcode&&!sku_code)||qty<=0){skipped++;continue}
+
+    const line={sku_code,barcode,
+      product_name:String(val(r,map,"product_name")||sku_code).trim(),
+      option_name:String(val(r,map,"option_name")||"").trim(),qty};
+    flat.push({...line,order_no,invoice_no,mgmt_no,
+      receiver:String(val(r,map,"receiver")||"").trim(),
+      shop:String(val(r,map,"shop")||"").trim(),
+      courier:String(val(r,map,"courier")||"").trim(),
+      memo:String(val(r,map,"memo")||"").trim(),
+      supplier:String(val(r,map,"supplier")||"").trim()});
+    added++;
+
+    const lc=String(val(r,map,"location_code")||"").trim();
+    if(lc)addLoc(sku_code,lc,val(r,map,"zone"),val(r,map,"pick_priority"));
+
+    /* ★ 그룹 키는 "한 박스" 단위여야 합니다.
+       송장번호가 있으면 그것만 그룹 키로 씁니다.
+       주문번호·관리번호는 "조회용 별칭"으로만 두고,
+       한 번호가 여러 송장에 걸리면 나중에 제거합니다(뭉침 방지). */
+    const groupKey=norm(invoice_no||order_no);
+    if(!orders.has(groupKey))orders.set(groupKey,{order_no,invoice_no,mgmt_no,
+      receiver:"",shop:"",courier:"",memo:"",supplier:"",lines:[],alias:false});
+    const o=orders.get(groupKey);
+    ["receiver","shop","courier","memo","supplier"].forEach(k=>{
+      if(!o[k]){const v=String(val(r,map,k)||"").trim(); if(v)o[k]=v}
+    });
+    const ex=o.lines.find(l=>l.sku_code===line.sku_code&&l.option_name===line.option_name);
+    if(ex)ex.qty+=qty; else o.lines.push({...line});
+
+    if(invoice_no){
+      [order_no,mgmt_no].filter(Boolean).map(norm).forEach(a=>{
+        if(a===groupKey)return;
+        if(a.length<4)return;      // "1","23" 같은 값은 조회 키로 쓰면 위험합니다
+
+        if(!aliasHits.has(a))aliasHits.set(a,new Set());
+        aliasHits.get(a).add(groupKey);
+      });
+    }
+  }
+
+  // 보조번호가 단 하나의 송장만 가리킬 때만 조회 별칭으로 등록
+  const aliasKeys=append?S.aliasKeys:new Set();
+  let ambiguous=0;
+  aliasHits.forEach((set,a)=>{
+    if(orders.has(a)&&!aliasKeys.has(a))return;      // 이미 진짜 송장 키
+    if(set.size===1){
+      const target=orders.get(Array.from(set)[0]);
+      if(target){orders.set(a,target);aliasKeys.add(a)}   // 같은 객체를 가리킴
+    }else{
+      if(orders.has(a)&&aliasKeys.has(a)){orders.delete(a);aliasKeys.delete(a)}
+      ambiguous++;
+    }
+  });
+
+  S.orders=orders; S.rows=flat; S.aliasKeys=aliasKeys; S.boxCache=null;
+  S.snapshotAt=Date.now(); S.snapshotId=snapshotId||("local-"+Date.now());
+  const boxes=orders.size-aliasKeys.size;
+  saveCache();                     // ★ 업로드 즉시 기기에 저장
+  toast(`${boxes}박스 / ${added}행 ${append?"추가":"적재"}`+
+        (skipped?` · ${skipped}행 제외`:"")+
+        (ambiguous?` · 분할출고 ${ambiguous}건`:""),"ok");
+  render();
+}
+function addLoc(sku,loc,zone,prio){
+  const k=norm(sku);
+  if(!S.locMap.has(k))S.locMap.set(k,[]);
+  const arr=S.locMap.get(k);
+  if(!arr.some(x=>norm(x.location_code)===norm(loc)))
+    arr.push({location_code:String(loc),zone:String(zone||""),prio:Number(prio||9999)});
+  arr.sort((a,b)=>a.prio-b.prio);
+}
+function ingestLoc(rows,map){
+  let n=0;
+  for(const r of rows){
+    const sku=String(val(r,map,"sku_code")||"").trim();
+    const loc=String(val(r,map,"location_code")||"").trim();
+    if(!sku||!loc)continue;
+    addLoc(sku,loc,val(r,map,"zone"),val(r,map,"pick_priority")); n++;
+  }
+  toast(`로케이션 매핑 ${n}건 적재`,"ok"); render();
+}
+
+/* =========================================================================
+ *  11-1. 엑셀 컬럼 자동 인식 + 화면 매핑
+ *     어떤 형식의 엑셀이든 넣으면 헤더를 읽어 자동 추측하고,
+ *     틀린 부분만 화면에서 고칠 수 있게 한다. 확정한 매핑은 저장해 재사용.
+ * ========================================================================= */
+let IMP=null;   // {rows, headers, kind, name, map, append}
+let FILEQ=[];   // 여러 파일을 한 번에 올렸을 때의 대기열
+function readFiles(list,kind){
+  FILEQ=Array.prototype.slice.call(list).map(function(f){return f});
+  nextFile(kind,false);
+}
+function nextFile(kind,append){
+  const f=FILEQ.shift(); if(!f)return;
+  readFile(f,kind,append);
+}
+
+/* ── 파일 양식 자동 판별 ──────────────────────────────────
+   A = 출고 검수 (이지어드민 확장주문검색)  → 송장번호·수취인이 있다
+   B = 토탈 피킹 (WMS 입고반출 예정확정)    → 정상다중로케이션·정상수량이 있다
+   확신이 없으면 억지로 고르지 않고 사람이 고르게 둡니다. */
+function detectKind(headers){
+  const F=k=>FIELDS.find(f=>f.k===k);
+  const g=k=>{const f=F(k);return f?guessCol(f,headers):""};
+  const wp=[],wo=[];
+  // B(토탈피킹) 근거
+  const loc=g("location_code"), qp=g("qty_pick"), pl=g("qty_plan");
+  let sp=0;
+  if(/정상다중로케이션|다중로케이션/.test(loc)){sp+=5;wp.push(loc)}
+  else if(loc){sp+=1}
+  if(/정상수량|확정수량/.test(qp)){sp+=4;wp.push(qp)}
+  if(pl){sp+=3;wp.push(pl)}
+  // A(출고검수) 근거
+  const inv=g("invoice_no"), rcv=g("receiver"), ono=g("order_no"), q=g("qty");
+  let so=0;
+  if(inv){so+=5;wo.push(inv)}
+  if(rcv){so+=4;wo.push(rcv)}
+  if(ono){so+=2;if(!inv)wo.push(ono)}
+  if(q&&!/정상수량|확정수량/.test(q)){so+=1}
+  if(sp>=4&&sp>so)return{kind:"pick",conf:sp,why:wp};
+  if(so>=4&&so>sp)return{kind:"orders",conf:so,why:wo};
+  return{kind:"",conf:0,why:[]};
+}
+
+/* 여러 파일을 한 번에 읽어 목록으로 만든다 (읽기만 — 적재는 확인 후) */
+let PQ=[];
+/* ── HTML 로 만들어진 가짜 .xls ──
+   이지어드민 등 일부 시스템은 HTML <table> 을 .xls 이름으로 내려줍니다.
+   엑셀 라이브러리에 그대로 넣으면 바코드가 8.80953E+12 처럼 지수로 깨지므로
+   표를 직접 읽어 셀 문자열을 원문 그대로 가져옵니다. */
+function looksHtml_(text){
+  const head=String(text||"").slice(0,2000).replace(/^\uFEFF/,"").trim().toLowerCase();
+  return head.indexOf("<")===0 && /<table|<html|<meta|<tr[\s>]/.test(head);
+}
+function decodeBytes_(buf){
+  const u=new Uint8Array(buf);
+  let t="";
+  try{ t=new TextDecoder("utf-8",{fatal:false}).decode(u) }catch(e){ t="" }
+  // 한글이 깨졌으면 EUC-KR 로 다시 (구형 시스템 대비)
+  if(!t||/\uFFFD/.test(t.slice(0,4000))){
+    try{ const t2=new TextDecoder("euc-kr").decode(u); if(t2&&!/\uFFFD/.test(t2.slice(0,4000)))t=t2 }catch(e){}
+  }
+  return t;
+}
+function parseHtmlTable(text){
+  let doc=null;
+  try{ doc=new DOMParser().parseFromString(text,"text/html") }catch(e){ return null }
+  if(!doc)return null;
+  // 행이 가장 많은 표를 고른다 (머리말용 작은 표가 앞에 오는 경우 대비)
+  let best=null,bestN=0;
+  doc.querySelectorAll("table").forEach(t=>{
+    const n=t.querySelectorAll("tr").length;
+    if(n>bestN){bestN=n;best=t}
+  });
+  const trs=best?best.querySelectorAll("tr"):doc.querySelectorAll("tr");
+  if(!trs||trs.length<2)return null;
+  const aoa=[];
+  trs.forEach(tr=>{
+    const row=[];
+    tr.querySelectorAll("th,td").forEach(td=>{
+      // 셀 안의 <br> 는 공백으로, 그 외는 보이는 글자 그대로
+      row.push(String(td.textContent==null?"":td.textContent).replace(/\u00a0/g," ").trim());
+    });
+    if(row.length)aoa.push(row);
+  });
+  return aoa.length>=2?aoa:null;
+}
+
+async function parseOne(f){
+  const isCsv0=/\.(csv|tsv|txt)$/i.test(f.name);
+  if(!isCsv0){                       // 엑셀이면 라이브러리를 먼저 준비
+    if(typeof XLSX==="undefined")Busy.sub("엑셀 라이브러리 준비 중...");
+    try{ await ensureXLSX() }catch(e){}
+  }
+  return new Promise(res=>{
+    const isCsv=isCsv0, fr=new FileReader();
+    fr.onerror=()=>res({file:f,name:f.name,err:"파일을 읽지 못했습니다"});
+    fr.onload=e=>{
+      let aoa=null,sheets=[f.name],html=false;
+      try{
+        // ① HTML 로 위장한 .xls 먼저 확인 (바코드·송장번호가 지수로 깨지는 것을 막습니다)
+        if(!isCsv){
+          const txt=decodeBytes_(e.target.result);
+          if(looksHtml_(txt)){ aoa=parseHtmlTable(txt); html=!!aoa; }
+        }
+        if(!aoa){
+          if(isCsv&&typeof XLSX==="undefined")aoa=parseCSVaoa(e.target.result);
+          else if(typeof XLSX==="undefined")return res({file:f,name:f.name,err:"엑셀 라이브러리를 불러오지 못했습니다"});
+          else{ const wb=XLSX.read(e.target.result,{type:isCsv?"string":"array"});
+            sheets=wb.SheetNames;
+            aoa=XLSX.utils.sheet_to_json(wb.Sheets[sheets[0]],{header:1,defval:"",blankrows:false,raw:false}); }
+        }
+      }catch(err){ return res({file:f,name:f.name,err:"형식을 확인하세요"}) }
+      let r; try{ r=aoaToRows(aoa) }catch(err){ return res({file:f,name:f.name,err:"표를 찾지 못했습니다"}) }
+      if(!r.rows.length||!r.headers.length)return res({file:f,name:f.name,err:"데이터 행이 없습니다"});
+      const d=detectKind(r.headers);
+      res({file:f,name:f.name,rows:r.rows,headers:r.headers,headerRow:r.headerRow,
+           sheets,html,kind:d.kind,auto:d.kind,why:d.why});
+    };
+    if(isCsv)fr.readAsText(f,"utf-8"); else fr.readAsArrayBuffer(f);
+  });
+}
+async function readFiles2(files){
+  const arr=Array.prototype.slice.call(files); if(!arr.length)return;
+  Busy.on("파일을 읽는 중",arr.length>1?("0 / "+arr.length+"개"):arr[0].name);
+  PQ=[];
+  for(let i=0;i<arr.length;i++){
+    Busy.set(i/arr.length*100);
+    Busy.sub(arr.length>1?((i+1)+" / "+arr.length+"개 · "+arr[i].name):arr[i].name);
+    await breathe();
+    PQ.push(await parseOne(arr[i]));
+  }
+  Busy.set(100); Busy.off();
+  $("cfg").classList.remove("on");
+  renderFq(); $("fq").classList.add("on");
+}
+/* 토탈 피킹 파일 1개 = 분류 1개.
+   대화물·소화물·천일·쿠팡·수출처럼 우리 창고에서 쓰는 이름을 붙여 저장합니다. */
+function catRow(i,x){
+  const list=(CFG.cats||[]).slice();
+  return '<div class="catbox"><div class="catlbl">이 파일의 분류</div><div class="catpick">'+
+    list.map(c=>'<button data-ci="'+i+'" data-c="'+esc(c)+'" class="'+(x.cat===c?"sel":"")+'">'+esc(c)+'</button>').join("")+
+    '<button data-ci="'+i+'" data-c="__NEW__" class="add">＋ 직접 입력</button>'+
+    '</div>'+(x.cat?'':'<div class="catwarn">분류를 고르지 않아도 되지만, 골라두면 나눠서 작업하고 기록에도 남습니다</div>')+'</div>';
+}
+function renderFq(){
+  const okN=PQ.filter(x=>!x.err&&x.kind&&x.kind!=="skip").length;
+  const un=PQ.filter(x=>!x.err&&!x.kind).length;
+  $("fqSub").textContent="총 "+PQ.length+"개 · 적용 "+okN+"개"+(un?" · 미선택 "+un+"개":"");
+  $("fqBody").innerHTML=PQ.map((x,i)=>{
+    if(x.err)return '<div class="fqcard" style="border-color:#7f1d1d"><div class="fn">'+esc(x.name)+
+      '</div><div class="fi" style="color:var(--err)">⛔ '+esc(x.err)+' — 이 파일은 건너뜁니다</div></div>';
+    const b=(k,t)=>'<button data-i="'+i+'" data-k="'+k+'" class="'+(x.kind===k?"sel":"")+' '+(k==="skip"?"skip":"")+'">'+t+'</button>';
+    return '<div class="fqcard"><div class="fn">'+esc(x.name)+'</div>'+
+      '<div class="fi">'+x.rows.length+'행 · 컬럼 '+x.headers.length+'개'+
+      (x.headerRow?' · 헤더 '+(x.headerRow+1)+'번째 줄':'')+
+      (x.sheets.length>1?' · 시트 '+x.sheets.length+'개 중 첫 번째':'')+
+      (x.html?' · <span style="color:#7ee2a8">HTML 표로 인식</span>':'')+'</div>'+
+      '<div class="fqpick">'+b("orders","A · 출고 검수")+b("pick","B · 토탈 피킹")+
+      b("loc","로케이션")+b("skip","건너뛰기")+'</div>'+
+      (x.kind==="pick"?catRow(i,x):"")+
+      (x.auto&&x.kind===x.auto&&x.why.length
+        ? '<div class="fqwhy">✓ 자동인식: '+x.why.map(esc).join(" · ")+' 컬럼을 찾았습니다</div>'
+        : (!x.kind?'<div class="fqwhy" style="color:var(--warn)">⚠ 자동인식 실패 — 직접 골라주세요</div>':''))+
+      '</div>';
+  }).join("");
+  document.querySelectorAll("#fqBody .fqpick button").forEach(btn=>btn.onclick=()=>{
+    const x=PQ[+btn.dataset.i]; x.kind=btn.dataset.k;
+    if(x.kind!=="pick")x.cat="";
+    renderFq();
+  });
+  document.querySelectorAll("#fqBody .catpick button").forEach(btn=>btn.onclick=async()=>{
+    const x=PQ[+btn.dataset.ci];
+    if(btn.dataset.c==="__NEW__"){
+      const v=await ask.text({title:"새 분류 만들기",
+        msg:"이 파일에 붙일 이름을 적으세요.<br>한 번 만들면 다음부터 버튼으로 나옵니다.",
+        ph:"예: 대화물, 소화물, 천일, 쿠팡, 수출",yes:"추가"});
+      if(!v||!v.trim())return;
+      const name=v.trim();
+      if((CFG.cats||[]).indexOf(name)<0){CFG.cats=(CFG.cats||[]).concat([name]);saveCfg()}
+      x.cat=name;
+    }else{
+      x.cat=(x.cat===btn.dataset.c)?"":btn.dataset.c;   // 다시 누르면 해제
+    }
+    renderFq();
+  });
+  $("fqOk").disabled=okN===0;
+  $("fqOk").textContent=okN?okN+"개 파일 적용":"적용할 파일을 골라주세요";
+}
+/* 확인 끝 → 종류별로 순서대로 적재. 같은 종류의 첫 파일은 교체, 나머지는 추가
+   ⚠ v1.1 버그수정: 저장된 컬럼매핑이 있으면 "매핑 확인" 화면을 건너뛰는데,
+   그 화면에 있던 [적용 + 전체 공유] 버튼까지 같이 사라져서
+   두 번째 업로드부터는 아무도 모르게 "이 기기에만" 적용되고 있었습니다.
+   → 컬럼매핑 화면은 그대로 건너뛰되, 큐가 다 끝나면 공유 여부를 반드시 물어봅니다. */
+let PQAppliedSkip=false;
+function runPQ(){
+  const list=PQ.filter(x=>!x.err&&x.kind&&x.kind!=="skip");
+  if(!list.length)return;
+  const seen={};
+  const step=async()=>{
+    const x=list.shift();
+    if(!x){
+      PQ=[]; PQNEXT=null;
+      if(PQAppliedSkip&&CFG.api){
+        PQAppliedSkip=false;
+        ask.confirm({title:"전체 공유",yes:"공유하기",no:"이 기기만",
+          msg:"방금 적용한 데이터를 다른 작업자 기기와도 공유할까요?<br>"+
+              '<span class="warn">공유하지 않으면 이 변경은 이 기기에만 남고, 새로고침·다른 기기에는 반영되지 않습니다.</span>'
+        }).then(ok=>{ if(ok)publishServer() });
+      }
+      return;
+    }
+    let append=!!seen[x.kind]; seen[x.kind]=1;
+    /* ⚠ 새 기능: 이 배치에서 이 종류(A/B)의 "첫" 파일인데 이미 적재된 데이터가
+       있으면, 조용히 교체해버리지 말고 누적할지 교체할지 물어봅니다.
+       (같은 배치 안에서 두 번째 파일부터는 원래대로 자동 추가 — 매번 안 물어봄) */
+    if(!append){
+      const hasExisting = x.kind==="orders" ? S.rows.length>0
+        : x.kind==="pick" ? S.wmsRows.some(w=>String(w.cat||"")===String(x.cat||""))
+        : false;
+      if(hasExisting){
+        const label = x.kind==="orders" ? `출고 데이터 ${S.rows.length}행`
+          : `"${x.cat?esc(x.cat):"분류 없음"}" 피킹 데이터`;
+        const choice=await ask.pick({title:"기존 데이터 처리",
+          msg:`이미 적재된 ${label}이(가) 있습니다.<br>"${esc(x.name)}" 파일을 어떻게 반영할까요?`,
+          options:[
+            {label:"➕ 추가(누적)",sub:"기존 데이터는 남기고 이 파일 내용을 더합니다",v:"append"},
+            {label:"🔁 교체(새로 시작)",sub:"기존 데이터를 지우고 이 파일로 바꿉니다",v:"replace"}
+          ]});
+        if(!choice){ if(PQNEXT){const n=PQNEXT;PQNEXT=null;setTimeout(n,80)} return }  // 취소 → 이 파일만 건너뜀
+        append = (choice==="append");
+      }
+    }
+    const saved=Store.get("map_"+x.kind,null);
+    const usable=saved&&fieldsFor(x.kind).filter(f=>f.req)
+      .every(f=>saved[f.k]&&x.headers.indexOf(saved[f.k])>=0);
+    IMP={rows:x.rows,headers:x.headers,kind:x.kind,name:x.name,sheets:x.sheets,
+         headerRow:x.headerRow,append,cat:x.cat||"",map:usable?saved:autoMap(x.headers,x.kind)};
+    PQNEXT=step;
+    /* ⚠ v1.2 버그수정: 토탈 피킹(B) 파일은 컬럼매핑이 저장돼 있어도 확인 화면을
+       건너뛰지 않습니다. 그 화면에 있는 [적용 + 전체 공유] 버튼을 매번 보고
+       눌러야, 분류가 서버에 안 올라가고 이 기기에만 남는 사고를 막을 수 있습니다. */
+    if(usable&&x.kind!=="pick"){ applyMapping(); }
+    else openMapper(usable);
+  };
+  $("fq").classList.remove("on");
+  step();
+}
+let PQNEXT=null;
+
+/* CSV 자체 파서 — SheetJS(CDN)를 못 받아도 앱이 죽지 않게 하는 최후 방어선.
+   창고 방화벽/오프라인 환경에서 실제로 발생합니다. 따옴표·줄바꿈 포함 처리. */
+function parseCSV(text){
+  if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+  const delim=(text.split("\n")[0].split("\t").length>text.split("\n")[0].split(",").length)?"\t":",";
+  const rows=[];let cur=[],val="",q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){val+='"';i++} else q=false } else val+=c }
+    else if(c==='"')q=true;
+    else if(c===delim){cur.push(val);val=""}
+    else if(c==="\n"){cur.push(val);rows.push(cur);cur=[];val=""}
+    else if(c!=="\r")val+=c;
+  }
+  if(val!==""||cur.length){cur.push(val);rows.push(cur)}
+  if(rows.length<2)return[];
+  const head=rows[0].map(h=>String(h).trim());
+  return rows.slice(1).filter(r=>r.some(v=>String(v).trim()!==""))
+    .map(r=>{const o={};head.forEach((h,i)=>{if(h)o[h]=(r[i]??"").trim()});return o});
+}
+
+/* ── 헤더 행 자동 탐지 ──────────────────────────────────────────────
+   WMS/이지어드민 엑셀은 첫 줄이 "예정정보 / 확정정보" 같은 묶음 제목이고
+   진짜 컬럼명이 둘째 줄에 있는 경우가 흔합니다.
+   무조건 첫 줄을 헤더로 쓰면 데이터가 통째로 깨지므로,
+   앞쪽 여러 줄을 훑어 "필드 이름과 가장 많이 일치하는 줄"을 헤더로 잡습니다. */
+const ALL_ALIASES=(()=>{const s=new Set();FIELDS.forEach(f=>f.a.forEach(x=>s.add(flatKey(x))));return s})();
+function scoreHeaderRow(row){
+  let hit=0,filled=0;
+  row.forEach(c=>{
+    const t=String(c==null?"":c).trim();
+    if(!t)return; filled++;
+    const k=flatKey(t);
+    if(ALL_ALIASES.has(k))hit+=3;
+    else for(const a of ALL_ALIASES){ if(a.length>2&&(k.indexOf(a)>=0||a.indexOf(k)>=0)){hit+=1;break} }
+  });
+  return hit*10+filled;        // 일치가 우선, 같으면 채워진 칸이 많은 줄
+}
+function findHeaderRow(aoa){
+  let best=0,bestScore=-1;
+  for(let i=0;i<Math.min(aoa.length-1,12);i++){
+    const sc=scoreHeaderRow(aoa[i]||[]);
+    if(sc>bestScore){bestScore=sc;best=i}
+  }
+  return best;
+}
+function aoaToRows(aoa){
+  if(!aoa||!aoa.length)return {rows:[],headers:[],headerRow:0};
+  const hi=findHeaderRow(aoa);
+  const seen={},head=(aoa[hi]||[]).map((c,i)=>{
+    let t=String(c==null?"":c).trim();
+    if(!t)return "";                                   // 빈 헤더 = 그 열은 버림
+    if(seen[t]){seen[t]++;t=t+" ("+seen[t]+")"}else seen[t]=1;
+    return t;
+  });
+  const rows=[];
+  for(let r=hi+1;r<aoa.length;r++){
+    const src=aoa[r]||[]; const o={}; let any=false;
+    head.forEach((h,i)=>{
+      if(!h)return;
+      const v=src[i]==null?"":src[i];
+      o[h]=v; if(String(v).trim()!=="")any=true;
+    });
+    if(any)rows.push(o);
+  }
+  return {rows,headers:head.filter(Boolean),headerRow:hi};
+}
+
+async function readFile(f,kind,append){
+  const isCsv=/\.(csv|tsv|txt)$/i.test(f.name);
+  if(!isCsv){ try{ await ensureXLSX() }catch(e){} }
+  const fr=new FileReader();
+  fr.onload=e=>{
+    let aoa=null,sheetNames=[f.name];
+    try{
+      if(isCsv&&typeof XLSX==="undefined"){ aoa=parseCSVaoa(e.target.result) }
+      else if(typeof XLSX==="undefined"){
+        return toast("엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결 후 새로고침하거나, CSV로 저장해서 올려주세요","err");
+      }else{
+        const wb=XLSX.read(e.target.result,{type:isCsv?"string":"array"});
+        sheetNames=wb.SheetNames;
+        aoa=XLSX.utils.sheet_to_json(wb.Sheets[sheetNames[0]],
+              {header:1,defval:"",blankrows:false,raw:false});
+      }
+    }catch(err){ return toast("파일을 읽지 못했습니다 — 형식을 확인하세요","err") }
+
+    const {rows,headers,headerRow}=aoaToRows(aoa);
+    if(!rows.length)return toast("데이터 행을 찾지 못했습니다","err");
+    if(!headers.length)return toast("컬럼명을 찾지 못했습니다","err");
+
+    const saved=Store.get("map_"+kind,null);
+    const usable=saved&&fieldsFor(kind).filter(f2=>f2.req)
+      .every(f2=>saved[f2.k]&&headers.indexOf(saved[f2.k])>=0);
+    IMP={rows,headers,kind,name:f.name,sheets:sheetNames,headerRow,append:!!append,
+         map:usable?saved:autoMap(headers,kind)};
+    // 두 번째 파일부터는 매핑이 확정돼 있으면 확인 화면 없이 바로 합칩니다
+    if(append&&usable){ applyMapping(true); return; }
+    openMapper(usable);
+  };
+  if(isCsv)fr.readAsText(f,"utf-8"); else fr.readAsArrayBuffer(f);
+}
+
+function openMapper(usedSaved){
+  $("cfg").classList.remove("on");
+  renderMapper();
+  $("map").classList.add("on");
+  if(usedSaved)toast("저장된 매핑을 불러왔습니다","ok");
+}
+
+function renderMapper(){
+  const fs=fieldsFor(IMP.kind);
+  const sample=IMP.rows.slice(0,3);
+  const miss=fs.filter(f=>f.req&&!IMP.map[f.k]);
+  $("mapTtl").textContent=({orders:"A · 출고 검수",pick:"B · 토탈 피킹",loc:"로케이션 매핑"}[IMP.kind]||"")+" 컬럼 확인";
+  $("mapSub").innerHTML=`<b>${esc(IMP.name)}</b> · ${IMP.rows.length}행 · 컬럼 ${IMP.headers.length}개`+
+    (IMP.sheets.length>1?` <span style="color:var(--warn)">· 시트 ${IMP.sheets.length}개 중 첫 번째만 사용</span>`:"");
+
+  $("mapBody").innerHTML=fs.map(f=>{
+    const sel=IMP.map[f.k]||"";
+    const opts=`<option value="">— 사용 안 함 —</option>`+
+      IMP.headers.map(h=>`<option value="${esc(h)}" ${h===sel?"selected":""}>${esc(h)}</option>`).join("");
+    const preview=sel?sample.map(r=>String(r[sel]??"").trim()).filter(Boolean).slice(0,2).join(" · "):"";
+    return `<div class="maprow ${f.req?"req":""} ${f.req&&!sel?"bad":""}">
+      <div class="mf">${f.n}${f.req?'<span class="star">*</span>':""}</div>
+      <select data-f="${f.k}">${opts}</select>
+      <div class="mp">${sel?(preview?esc(preview):'<span style="color:var(--warn)">값이 비어 있음</span>'):""}</div>
+    </div>`}).join("");
+
+  document.querySelectorAll("#mapBody select").forEach(s=>s.onchange=()=>{
+    const v=s.value;
+    if(v)IMP.map[s.dataset.f]=v; else delete IMP.map[s.dataset.f];
+    renderMapper();
+  });
+
+  const unused=IMP.headers.filter(h=>!Object.values(IMP.map).includes(h));
+  $("mapUnused").innerHTML=unused.length
+    ? `사용하지 않는 컬럼 ${unused.length}개: <span style="color:var(--dim)">${unused.slice(0,12).map(esc).join(", ")}${unused.length>12?" 외 "+(unused.length-12)+"개":""}</span>`
+    : "";
+
+  const ok=miss.length===0;
+  $("mapWarn").innerHTML=ok?"":
+    `<span style="color:var(--err)">필수 항목 미지정: <b>${miss.map(f=>f.n).join(", ")}</b></span>`;
+  $("mapOk").disabled=!ok;
+  $("mapOk").textContent=ok?`이 매핑으로 적용 (${IMP.rows.length}행)`:"필수 항목을 지정하세요";
+}
+
+async function applyMapping(forceAppend){
+  Store.set("map_"+IMP.kind,IMP.map);
+  const kind=IMP.kind, app=forceAppend||IMP.append,
+        rows=IMP.rows, name=IMP.name, map=IMP.map, cat=IMP.cat||"";
+  $("map").classList.remove("on"); IMP=null;
+  const big=rows.length>800;
+  if(big)Busy.on("데이터를 넣는 중","0 / "+rows.length+"행");
+  const prog=(i,n)=>{ Busy.set(i/n*100); Busy.sub(i+" / "+n+"행") };
+  try{
+    if(kind==="orders")await ingest(rows,"file-"+name,map,app,big?prog:null);
+    else if(kind==="pick")await ingestPick(rows,map,app,cat,big?prog:null);
+    else ingestLoc(rows,map);
+  }catch(e){ toast("적재 중 오류: "+(e&&e.message||e),"err") }
+  finally{ Busy.off() }
+  /* ⚠ v1.2 버그수정: [적용]만 누르고 [전체 공유]를 안 누르면 이 기기에만 남아,
+     새로고침할 때 서버(구 데이터)가 자동으로 덮어써서 방금 넣은 분류가 사라집니다.
+     → 어떤 경로로 적재됐든(자동 매핑 건너뛰기 포함) 공유 여부를 큐가 끝날 때 반드시 묻습니다. */
+  if(kind==="orders"||kind==="pick")PQAppliedSkip=true;
+  if(PQNEXT){const n=PQNEXT;PQNEXT=null;setTimeout(n,80);return kind}  // 대기중인 다음 파일
+  if(FILEQ.length)setTimeout(function(){nextFile(kind,true)},120);
+  return kind;
+}
+$("mapOk").onclick=()=>{
+  applyMapping();
+  if(CFG.api)toast("이 기기에만 적용됐습니다 · 함께 보려면 '전체 공유'","ok");
+};
+$("mapShare").onclick=async()=>{ await applyMapping(); PQAppliedSkip=false; await publishServer() };
+$("mapCancel").onclick=()=>{$("map").classList.remove("on");IMP=null;
+  if(PQNEXT){const n=PQNEXT;PQNEXT=null;setTimeout(n,80)}};   // 한 파일 취소해도 나머지는 진행
+$("fqOk").onclick=()=>runPQ();
+$("fqCancel").onclick=()=>{PQ=[];PQNEXT=null;$("fq").classList.remove("on")};
+$("mapReset").onclick=()=>{IMP.map=autoMap(IMP.headers,IMP.kind);renderMapper();toast("자동 인식으로 되돌렸습니다")};
+/* =========================================================================
+ *  11-2. 공유 — 한 명이 올리면 모두가 같은 데이터를 봅니다
+ *     관리자: 엑셀 업로드 → publish → 구글시트
+ *     작업자: 앱 열면 자동으로 받아옴 + 새 데이터 올라오면 알림
+ * ========================================================================= */
+/** 서버 응답을 해석하고, 실패하면 "무엇을 고쳐야 하는지"를 알려줍니다 */
+function parseApi_(text,status){
+  const t=String(text||"").trim();
+  if(!t)throw new Error("서버가 빈 응답을 보냈습니다 (배포가 안 됐거나 URL이 잘못됨)");
+  if(t[0]==="{"||t[0]==="["){
+    try{ return JSON.parse(t) }catch(e){ throw new Error("응답을 읽지 못했습니다") }
+  }
+  // JSON 이 아니라 HTML 이 왔다 = 구글이 로그인/권한 화면을 돌려준 것
+  const low=t.toLowerCase();
+  if(low.indexOf("accounts.google.com")>=0||low.indexOf("signin")>=0||
+     low.indexOf("로그인")>=0||low.indexOf("sign in")>=0)
+    throw new Error("AUTH|구글 로그인 화면이 돌아왔습니다.\n배포 설정의 [액세스 권한]을 '모든 사용자'로 바꿔야 합니다.");
+  if(low.indexOf("승인이 필요")>=0||low.indexOf("authorization")>=0||low.indexOf("권한")>=0)
+    throw new Error("AUTH|접근 권한이 없습니다.\n배포 > 배포 관리에서 액세스 권한을 확인하세요.");
+  if(low.indexOf("script function not found")>=0||low.indexOf("doget")>=0)
+    throw new Error("CODE|스크립트에 doGet 함수가 없습니다. 코드를 다시 붙여넣고 새 버전으로 배포하세요.");
+  if(status===404)throw new Error("주소를 찾을 수 없습니다 (404) — URL 끝이 /exec 인지 확인하세요");
+  throw new Error("서버가 JSON 대신 웹페이지를 보냈습니다. 배포 설정을 확인하세요.");
+}
+
+async function api(action,payload){
+  if(!CFG.api)throw new Error("공유 서버 주소가 설정되지 않았습니다");
+  if(!/\/exec\/?$/.test(CFG.api))
+    throw new Error("URL|주소가 /exec 로 끝나야 합니다.\n지금 주소: "+CFG.api.slice(-24));
+  let res;
+  try{
+    res=payload
+      ? await fetch(CFG.api,{method:"POST",redirect:"follow",
+          headers:{"Content-Type":"text/plain;charset=utf-8"},
+          body:JSON.stringify(Object.assign({action,key:CFG.shareKey},payload))})
+      : await fetch(CFG.api+"?action="+action,{redirect:"follow"});
+  }catch(e){
+    // fetch 자체가 실패 = 네트워크 차단 또는 CORS
+    throw new Error("NET|서버에 닿지 못했습니다.\n인터넷 연결, 또는 배포 액세스 권한이 '모든 사용자'인지 확인하세요.");
+  }
+  const text=await res.text();
+  return parseApi_(text,res.status);
+}
+/** 오류 메시지를 사람이 읽을 수 있게 */
+const errMsg=e=>String(e&&e.message||e).replace(/^[A-Z]+\|/,"");
+
+/** 서버에서 최신 데이터 받아오기 (작업자·관리자 공통) */
+async function pullServer(silent){
+  if(!CFG.api){ if(!silent)toast("먼저 ⚙ 설정에서 API URL을 넣어주세요","err"); return false }
+  S.busy=true; render();
+  try{
+    const j=await api("snapshot");
+    if(!j.ok)throw new Error(j.error||"응답 오류");
+    if((!j.rows||!j.rows.length)&&(!j.pick||!j.pick.length)){
+      S.serverOk=true; S.busy=false;
+      if(!silent)toast("서버에 아직 올라온 데이터가 없습니다","err");
+      render(); return false;
+    }
+    if(!j.rows)j.rows=[];
+    S.skuMaster=new Map((j.sku||[]).map(x=>[norm(x.barcode),x.sku_code]));
+    S.locMap=new Map();
+    (j.loc||[]).forEach(s=>addLoc(s.sku_code,s.location_code,s.zone,s.pick_priority));
+    const idm={}; FIELDS.forEach(f=>idm[f.k]=f.k);
+    if(j.rows.length>800)Busy.on("최신 데이터를 받는 중","0 / "+j.rows.length+"행");
+    await ingest(j.rows,j.snapshot_id,idm,false,
+      j.rows.length>800?((i,n)=>{Busy.set(i/n*100);Busy.sub(i+" / "+n+"행")}):null);
+    Busy.off();
+    applyPick(j.pick);      // 토탈 피킹 리스트 (없으면 그대로 둠)
+    S.publishedBy=j.published_by||""; S.publishedAt=j.published_at||"";
+    S.remoteSnap=j.snapshot_id; S.serverOk=true; S.busy=false;
+    $("newbar").style.display="none";      // 받았으니 알림 배너를 내린다
+    Store.set("cache",{rows:j.rows,loc:j.loc||[],sku:j.sku||[],pick:pickPayload(),
+      snapshot_id:j.snapshot_id,by:S.publishedBy,at:S.publishedAt});
+    if(!silent)toast(`최신 데이터를 받았습니다 · 출고 ${j.rows.length}행`+
+      (S.wmsRows.length?` · 피킹 ${S.wmsRows.length}줄`:""),"ok");
+    render(); return true;
+  }catch(e){
+    S.serverOk=false; S.busy=false; S.lastError=errMsg(e);
+    if(!silent){
+      toast("받기 실패 — ⚙ 설정에서 원인 확인","err");
+      await ask.alert({title:"데이터를 받지 못했습니다",msg:esc(errMsg(e)).replace(/\n/g,"<br>")});
+    }
+    render(); return false;
+  }
+}
+
+/** 관리자: 지금 앱에 있는 데이터를 전체 공유 */
+/* 공유용 페이로드 — 피킹 대상 + (대체 로케이션 찾기용) 수량 0 재고행 */
+function pickPayload(){
+  const out=S.wmsRows.map(r=>Object.assign({},r,{qty_pick:r.req,qty_plan:r.plan,pick_priority:r.prio,cat:r.cat||""}));
+  const have=new Set(S.wmsRows.map(r=>norm(r.barcode)+"|"+norm(r.location_code)));
+  (S.stockRows||[]).forEach(r=>{
+    const k=norm(r.barcode)+"|"+norm(r.location_code);
+    if(have.has(k))return; have.add(k);
+    out.push({barcode:r.barcode,sku_code:r.barcode,product_name:r.product_name,
+      location_code:r.location_code,zone:"",pick_priority:0,qty_pick:0,qty_plan:0});
+  });
+  return out;
+}
+async function publishServer(){
+  if(!CFG.api)return toast("먼저 ⚙ 설정에서 API URL을 넣어주세요","err");
+  if(!S.rows.length&&!S.wmsRows.length)return toast("공유할 데이터가 없습니다","err");
+  if(!await ask.confirm({title:"전체 공유",yes:"공유하기",
+    msg:`출고 <b>${S.rows.length}행</b> · 토탈피킹 <b>${S.wmsRows.length}줄</b> 을 모든 기기에 공유합니다.<br><br>`+
+      '<span class="warn">기존 공유 데이터는 교체됩니다.</span>'}))return;
+  S.busy=true; render();
+  try{
+    const j=await api("publish",{worker:CFG.worker||"관리자",rows:S.rows,pickCount:S.wmsRows.length});
+    if(!j.ok)throw new Error(j.error||"응답 오류");
+    S.snapshotId=j.snapshot_id; S.remoteSnap=j.snapshot_id;
+    S.publishedBy=CFG.worker||"관리자"; S.publishedAt=new Date().toISOString();
+    S.serverOk=true;
+    // ★ 토탈 피킹 리스트도 함께 올린다 — 안 올리면 폰에서 모드 B 가 안 열립니다
+    try{ const jp=await api("pick",{rows:pickPayload()});
+      if(!jp.ok)toast("피킹 리스트 공유 실패 — 구글시트 코드를 최신으로 올려주세요","err");
+    }catch(e){ toast("피킹 리스트 공유 실패 — 구글시트 코드 업데이트 필요","err") }
+    // 로케이션 매핑도 함께 올린다
+    if(S.locMap.size){
+      const loc=[];
+      S.locMap.forEach((arr,sku)=>arr.forEach(x=>loc.push({sku_code:sku,
+        location_code:x.location_code,zone:x.zone,pick_priority:x.prio})));
+      try{ await api("loc",{rows:loc}) }catch(e){}
+    }
+    toast(`전체 공유 완료 · 출고 ${j.rows}행 · 피킹 ${S.wmsRows.length}줄`,"ok");
+  }catch(e){
+    S.serverOk=false; S.lastError=errMsg(e);
+    toast("공유 실패","err");
+    await ask.alert({title:"전체 공유 실패",msg:esc(errMsg(e)).replace(/\n/g,"<br>")});
+  }
+  S.busy=false; render();
+}
+
+/* ── 동시 작업 ──
+   다른 사람이 끝낸 송장을 받아와 내 화면에도 '완료'로 표시합니다.
+   전체 스냅샷이 아니라 "마지막 확인 이후 완료된 것"만 받으므로 매우 가볍습니다. */
+async function pullProgress(silent){
+  if(!CFG.api||!navigator.onLine)return;
+  try{
+    const j=await api("progress"+(S.progAt?"&since="+encodeURIComponent(S.progAt):""));
+    if(!j.ok)return;
+    let n=0;
+    (j.done||[]).forEach(d=>{
+      const k=norm(d.i||d.o); if(!k)return;
+      const cur=S.done.get(k);
+      if(cur&&String(cur.at)>=String(d.t))return;      // 내 기록이 더 최신이면 유지
+      S.done.set(k,{at:d.t,worker:d.w||"",errors:Number(d.e||0),
+        invoice_no:d.i,order_no:d.o,remote:true,lines:cur?cur.lines:[]});
+      n++;
+    });
+    S.progAt=j.at||S.progAt; Store.set("progAt",S.progAt);
+    if(n){ saveDone(); S.boxCache=null;
+      if(!silent)toast(`다른 작업자 완료 ${n}건 반영`,"ok");
+      if(!S.cur&&S.mode==="A")render(); }
+  }catch(e){}
+}
+setInterval(()=>{ if(document.visibilityState==="visible")pullProgress(true) },60000);
+
+/** 30초마다 새 데이터가 올라왔는지만 가볍게 확인 (전체를 받지 않음) */
+async function checkNew(){
+  if(!CFG.api||!CFG.autoSync||!navigator.onLine)return;
+  if($("map").classList.contains("on"))return;
+  try{
+    const j=await api("check");
+    if(!j.ok)return;
+    S.serverOk=true;
+    S.remoteSnap=j.snapshot_id;
+    // snapshot_id 뿐 아니라 게시 시각도 비교한다.
+    // 같은 초에 두 번 올리면 ID가 겹칠 수 있어 ID만으로는 놓칩니다.
+    const stale=!!j.snapshot_id&&
+      (j.snapshot_id!==S.snapshotId||
+       (!!j.published_at&&!!S.publishedAt&&j.published_at!==S.publishedAt));
+    $("newbar").style.display=stale?"flex":"none";
+    if(stale)$("newbarTxt").textContent=
+      `새 출고 데이터가 있습니다 · ${j.published_by||""} ${j.rows||0}행`;
+  }catch(e){ S.serverOk=false }
+}
+setInterval(()=>{ if(document.visibilityState==="visible")checkNew() },30000);
+
+/** 오류 발생을 서버에 기록 — "언제 누가 무엇을 잘못 스캔했는지" */
+function logError(type,code,message,extra){
+  S.errQueue.push(Object.assign({
+    err_id:uuid(), occurred_at:new Date().toISOString(),
+    type, worker:CFG.worker||"미지정", device_id:CFG.deviceId,
+    mode:S.mode||"", scanned_code:code||"", message:message||""
+  },extra||{}));
+  Store.set("errq",S.errQueue);
+  flushErrors();
+}
+async function flushErrors(){
+  if(!S.errQueue.length||!CFG.api||!navigator.onLine)return;
+  const batch=S.errQueue.slice(0,30);
+  try{
+    const j=await api("error",{rows:batch});
+    if(j.ok){const done=new Set(batch.map(b=>b.err_id));
+      S.errQueue=S.errQueue.filter(r=>!done.has(r.err_id));Store.set("errq",S.errQueue)}
+  }catch(e){}
+}
+function demo(){
+  const rows=[
+   {주문번호:"ORD-1001",송장번호:"1234567890",상품코드:"A-100",바코드:"8801234500011",상품명:"베이직 반팔티",옵션명:"블랙/L",수량:2,수취인:"김철수",판매처:"스마트스토어",택배사:"CJ대한통운",로케이션:"A-01-1",구역:"A",피킹순서:1},
+   {주문번호:"ORD-1001",송장번호:"1234567890",상품코드:"B-200",바코드:"8801234500028",상품명:"코튼 양말 3족",옵션명:"화이트",수량:1,수취인:"김철수",판매처:"스마트스토어",택배사:"CJ대한통운",로케이션:"A-03-2",구역:"A",피킹순서:2},
+   {주문번호:"ORD-1002",송장번호:"1234567891",상품코드:"C-300",바코드:"8801234500035",상품명:"캔버스 에코백",옵션명:"베이지",수량:1,수취인:"이영희",판매처:"쿠팡",택배사:"CJ대한통운",로케이션:"B-01-1",구역:"B",피킹순서:5},
+   {주문번호:"ORD-1003",송장번호:"1234567892",상품코드:"A-100",바코드:"8801234500011",상품명:"베이직 반팔티",옵션명:"화이트/M",수량:3,수취인:"박민수",판매처:"11번가",택배사:"롯데택배",로케이션:"A-01-1",구역:"A",피킹순서:1},
+   {주문번호:"ORD-1003",송장번호:"1234567892",상품코드:"D-400",바코드:"8801234500042",상품명:"보온 텀블러 500ml",옵션명:"실버",수량:1,수취인:"박민수",판매처:"11번가",택배사:"롯데택배",로케이션:"C-02-3",구역:"C",피킹순서:9},
+   {주문번호:"ORD-1004",송장번호:"1234567893",상품코드:"B-200",바코드:"8801234500028",상품명:"코튼 양말 3족",옵션명:"화이트",수량:4,수취인:"최지은",판매처:"자사몰",택배사:"한진택배",로케이션:"A-03-2",구역:"A",피킹순서:2}
+  ];
+  ingest(rows,"demo",autoMap(Object.keys(rows[0]),"orders"));
+  $("cfg").classList.remove("on");
+  toast("데모 적재 완료","ok");
+}
+
+/* =========================================================================
+ *  12. 렌더링
+ * ========================================================================= */
+function render(){
+  renderHeader(); renderQueue();
+  let r;
+  if(!S.mode)r=renderHome();
+  else if(S.mode==="A")r=renderA();
+  else if(S.mode==="B")r=renderB();
+  else r=renderC();
+  renderEntry();
+  return r;
+}
+
+function renderHome(){
+  $("title").textContent="물류 스캔";
+  $("modeChip").style.display="none";
+  $("btnHome").style.display="none";
+  $("foot").style.display="none";
+  const has=S.orders.size>0, hasWms=S.wmsRows.length>0,
+        hasLoc=hasWms||S.locMap.size>0, hasWorker=!!CFG.worker.trim();
+  const canB=hasWms||(has&&S.locMap.size>0);
+  $("scanmsg").textContent=!hasWorker?"작업자 이름을 먼저 입력하세요"
+    :has?"할 작업을 선택하세요":"출고 데이터를 받아오세요";
+
+  // 데이터 상태 한 줄 요약
+  let dataLine, dataCls;
+  if(!has){ dataLine="출고 데이터 없음"; dataCls="err" }
+  else{
+    const min=Math.floor((Date.now()-S.snapshotAt)/60000);
+    const tot=S.orders.size-S.aliasKeys.size;
+    let dn=0; S.orders.forEach((o,k)=>{if(!S.aliasKeys.has(k)&&S.done.has(k))dn++});
+    dataLine=`${tot}박스 · 검수 ${dn}/${tot} 완료`
+      +(min<1?" · 방금 받음":` · ${min}분 전`);
+    dataCls=min<30?"ok":min<120?"warn":"err";
+  }
+  const conn=!CFG.api?{t:"공유 미설정 — 이 기기에서만 사용",c:"warn"}
+    :S.serverOk===false?{t:"서버 연결 실패",c:"err"}
+    :S.serverOk===true?{t:S.publishedBy?esc(S.publishedBy)+" 올림":"공유 연결됨",c:"ok"}
+    :{t:"연결 확인 전",c:""};
+
+  $("main").innerHTML=`
+  <div class="wcard">
+    <div class="k">작업자 이름 <span style="color:var(--err)">*</span></div>
+    <input id="homeWorker" class="winput" type="text" placeholder="이름을 입력하세요"
+      value="${esc(CFG.worker)}" autocomplete="off">
+    <div class="hint" style="margin-top:6px">모든 검수·오류 기록에 이 이름이 남습니다</div>
+  </div>
+
+  <div class="statrow">
+    <div class="stat ${dataCls}"><b>출고 데이터</b><span>${dataLine}</span></div>
+    <div class="stat ${conn.c}"><b>공유 상태</b><span>${conn.t}</span></div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn blue" onclick="pullServer()" ${S.busy?"disabled":""}>
+      ${S.busy?"불러오는 중...":"↓ 최신 데이터 받기"}</button>
+    <button class="btn ghost" onclick="openCfg()">⚙</button>
+  </div>
+
+  <div class="k" style="margin:6px 0 9px">할 작업을 선택하세요</div>
+
+  <button class="modecard A" ${has&&hasWorker?"":"disabled"} onclick="pickMode('A')">
+    <div class="ic">✓</div><div><div class="tt">A · 출고 검수</div>
+    <div class="dd">포장 직전 최종 확인. <b>송장을 스캔하거나 번호를 입력</b>하면 품목이 뜹니다.</div></div></button>
+
+  <button class="modecard B" ${canB&&hasWorker?"":"disabled"} onclick="pickMode('B')">
+    <div class="ic">▦</div><div><div class="tt">B · 토탈 피킹</div>
+    <div class="dd">창고를 돌며 상품을 모읍니다. 갈 위치와 수량을 화면이 안내.
+    ${hasWms?`<br><span style="color:#7ee2a8">WMS 피킹 리스트 ${S.wmsRows.length}줄 준비됨</span>`+
+      (()=>{const m={};S.wmsRows.forEach(w=>{const c=w.cat||"(분류 없음)";m[c]=(m[c]||0)+1});
+        const k=Object.keys(m); return k.length&&!(k.length===1&&k[0]==="(분류 없음)")
+          ? `<br><span style="color:#93c5fd;font-size:12px">분류: ${k.map(c=>esc(c)+" "+m[c]+"줄").join(" · ")}</span>`:""})()
+       :canB?"":'<br><span style="color:#fca5a5">⚙ 설정 → ② 토탈 피킹 리스트를 올려주세요</span>'}</div></div></button>
+
+  <button class="modecard C" ${has&&hasWorker?"":"disabled"} onclick="pickMode('C')">
+    <div class="ic">⊞</div><div><div class="tt">C · 분배</div>
+    <div class="dd">모아온 상품을 주문별로 나눕니다. 상품을 스캔하면 어느 박스인지 알려줍니다.</div></div></button>
+
+  ${(S.pick&&S.mode!=="B")?`<button class="btn primary" style="width:100%;margin-top:12px" onclick="resumePick()">
+    ▶ 작업 중이던 토탈 피킹 이어하기 (${S.pick.lines.filter(l=>S.pick.three?l.step==="DONE":l.got>=l.req).length}/${S.pick.lines.length} 완료)</button>`:""}
+  ${S.pickHist.length?`<button class="btn" style="width:100%;margin-top:12px" onclick="openHist()">
+    📋 토탈 피킹 이력 (${S.pickHist.length}회${S.pickHist.filter(h=>!h.sent).length?` · <span style="color:#fbbf24">미전송 ${S.pickHist.filter(h=>!h.sent).length}</span>`:""})</button>`:""}
+  ${S.lastPick?`<button class="btn blue" style="width:100%;margin-top:12px" onclick="openMove()">
+    🚚 직전 피킹의 이동 내역 보기 (${S.lastPick.lines.filter(l=>l.moved).length}건)</button>`:""}
+
+  <div class="flow" style="margin-top:16px">작업 순서 &nbsp;
+    <b style="color:#93c5fd">B 모으기</b> ▸ <b style="color:#d8b4fe">C 나누기</b> ▸ <b style="color:#7ee2a8">A 확인하기</b><br>
+    <span style="opacity:.7">물량이 적은 날은 A만 해도 됩니다</span></div>
+
+  <div class="notice" id="homeNotice" style="${(hasWorker&&has)?"display:none":""}">
+    ${!hasWorker?"작업자 이름을 입력해야 시작할 수 있습니다"
+      :"위 <b>최신 데이터 받기</b>를 누르세요.<br>데이터가 없다면 관리자가 아직 올리지 않은 것입니다."}
+  </div>`;
+
+  const wi=$("homeWorker");
+  if(wi){
+    wi.oninput=()=>{
+      const v=wi.value.trim();
+      CFG.worker=wi.value; saveCfg();
+      document.querySelectorAll(".modecard").forEach(b=>{
+        const m=b.className.match(/modecard (\w)/)[1];
+        const need=m==="B"?(S.orders.size&&S.locMap.size):S.orders.size;
+        b.disabled=!(need&&v);
+      });
+      const n=$("homeNotice");
+      if(n){
+        if(v&&S.orders.size)n.style.display="none";
+        else{n.style.display="";
+          n.innerHTML=!v?"작업자 이름을 입력해야 시작할 수 있습니다"
+            :"위 <b>최신 데이터 받기</b>를 누르세요.<br>데이터가 없다면 관리자가 아직 올리지 않은 것입니다.";}
+      }
+      $("scanmsg").textContent=v?
+        (S.orders.size?"할 작업을 선택하세요":"출고 데이터를 받아오세요"):"작업자 이름을 먼저 입력하세요";
+    };
+  }
+}
+window.pullServer=pullServer;
+window.openCfg=()=>$("btnCfg").click();
+window.pickMode=m=>{
+  if(!CFG.worker.trim())return toast("작업자 이름을 먼저 입력하세요","err");
+  S.mode=m; S.cur=null; S.sort=null; S.pick=null;
+  if(m==="B"){
+    // 구역 규칙을 설정해 둔 경우에만 물어봅니다.
+    // (혼자 쓰는 창고에서 매번 화면이 뜨면 방해되므로 기본은 바로 시작)
+    const zs=S.wmsRows.length?zoneStats():null;
+    if(zs&&!zs.auto&&zs.groups.length>1){ openZone(zs); return }
+    buildPickList();
+  } else setPhase(m==="C"?"SORTING":"IDLE");
+};
+
+/* 구역 선택 화면 */
+function openZone(z){
+  z=z||zoneStats();
+  const tot=S.wmsRows.length, totQ=S.wmsRows.reduce((a,w)=>a+w.req,0);
+  $("znSub").textContent=`전체 ${tot}줄 / ${totQ}개`;
+  const btn=(name,label,n,qty,cls)=>`<button class="znbtn ${cls||""}" data-z="${esc(name)}">
+    <span class="zt">${esc(label)}</span>
+    <span class="zq"><b>${n}</b>줄<br>${qty}개</span></button>`;
+  $("znBody").innerHTML=
+    btn("__ALL__","전체 (혼자 할 때)",tot,totQ,"all")+
+    `<div class="k" style="margin:14px 0 7px">분류별로 나눠 맡기</div>`+
+    z.groups.map(g=>btn(g.name,g.name,g.n,g.qty,g.name===CFG.lastZone?"mine":"")).join("")+
+    (z.groups.length?"":`<p class="hint" style="margin-top:12px">
+      아직 분류가 없습니다. 파일을 올릴 때 <b>대화물·소화물·베이비룸</b> 처럼 분류를 골라두면
+      여기서 나눠 맡을 수 있습니다.</p>`);
+  document.querySelectorAll("#znBody .znbtn").forEach(b=>b.onclick=()=>{
+    const z2=b.dataset.z;
+    CFG.lastZone=(z2==="__ALL__")?"":z2; saveCfg();
+    $("zn").classList.remove("on");
+    buildPickList(z2);
+    if(z2!=="__ALL__")toast(`${z2} 구역 ${S.pick?S.pick.lines.length:0}줄을 맡았습니다`,"ok");
+  });
+  $("zn").classList.add("on");
+}
+window.openZone=openZone;
+$("znCancel").onclick=()=>{$("zn").classList.remove("on");S.mode=null;setPhase("IDLE")};
+$("znEdit").onclick=()=>{ $("zn").classList.remove("on"); editCats() };
+
+/* 구역 이름 설정 — 로케이션 앞자리에 우리 창고 용어를 붙입니다 */
+
+
+/* ── 진행 현황: 완료 / 미완료 구분 ──
+   602박스를 다루려면 "무엇이 남았는지"가 보여야 합니다. */
+/* 602박스를 매번 다시 계산하면 PDA 에서 버벅입니다.
+   목록의 뼈대(송장·수취인·수량)는 데이터가 바뀔 때만 만들고,
+   완료 여부만 그때그때 붙입니다. */
+function boxList(){
+  if(!S.boxCache){
+    const out=[];
+    S.orders.forEach((o,k)=>{
+      if(S.aliasKeys.has(k))return;             // 조회용 별칭은 제외
+      let q=0; for(let i=0;i<o.lines.length;i++)q+=o.lines[i].qty;
+      out.push({key:k,invoice:o.invoice_no||o.order_no,order:o.order_no,
+        receiver:o.receiver||"",shop:o.shop||"",items:o.lines.length,qty:q,
+        _s:norm((o.invoice_no||"")+(o.order_no||""))+(o.receiver||"")});
+    });
+    S.boxCache=out;
+  }
+  for(let i=0;i<S.boxCache.length;i++){
+    const x=S.boxCache[i], d=S.done.get(x.key);
+    x.done=!!d; x.at=d?d.at:""; x.worker=d?d.worker:""; x.errors=d?d.errors:0;
+  }
+  return S.boxCache;
+}
+function renderProgress(){
+  const all=boxList();
+  const done=all.filter(x=>x.done), todo=all.filter(x=>!x.done);
+  const pct=all.length?Math.round(done.length/all.length*100):0;
+  const q=norm(S.listQ);
+  let list=S.listFilter==="done"?done:S.listFilter==="all"?all:todo;
+  if(q)list=list.filter(x=>x._s.indexOf(q)>=0);
+  // 완료는 최근 완료 순, 미완료는 원래 순서
+  if(S.listFilter==="done")list=list.slice().sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  const shown=list.slice(0,60);
+
+  return `
+  <div class="card" style="padding:13px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end">
+      <div><div class="k">오늘 검수 진행</div>
+        <div style="font-weight:800;font-size:19px">${done.length} <span style="color:var(--dim);font-size:15px">/ ${all.length} 박스</span></div></div>
+      <div style="text-align:right"><div class="k">남은 박스</div>
+        <div style="font-weight:800;font-size:19px;color:${todo.length?"var(--warn)":"var(--ok)"}">${todo.length}</div></div>
+    </div>
+    <div class="progbar" style="margin-top:11px"><div class="progfill" style="width:${pct}%"></div></div>
+    <div class="progtxt"><span>${pct}% 완료</span>
+      <span>${S.publishedBy?esc(S.publishedBy)+" 올림":""}</span></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab ${S.listFilter==="todo"?"on":""}" data-f="todo">미완료 ${todo.length}</button>
+    <button class="tab ${S.listFilter==="done"?"on":""}" data-f="done">완료 ${done.length}</button>
+    <button class="tab ${S.listFilter==="all"?"on":""}" data-f="all">전체 ${all.length}</button>
+    <button class="tab csv" id="btnSyncP" title="다른 작업자 현황 받기">⟳</button>
+    <button class="tab csv" id="btnCsv" title="엑셀로 내보내기">⤓ CSV</button>
+  </div>
+  <input id="listQ" class="winput" style="font-size:15px;padding:11px;margin-bottom:10px"
+    placeholder="송장·주문번호·수취인 검색" value="${esc(S.listQ)}">
+
+  ${shown.length?shown.map(x=>`
+    <div class="brow ${x.done?"ok":""}">
+      <div class="bchk">${x.done?"✓":""}</div>
+      <div class="binfo">
+        <div class="bno mono">${esc(x.invoice)}</div>
+        <div class="bsub">${x.receiver?esc(x.receiver)+" · ":""}${x.items}종 ${x.qty}개${x.shop?" · "+esc(x.shop):""}</div>
+      </div>
+      <div class="btime">${x.done
+        ?`<b>${hhmm(x.at)}</b><small>${esc(x.worker)}${x.errors?` · 오류${x.errors}`:""}</small>`
+        :`<span class="waiting">대기</span>`}</div>
+    </div>`).join("")
+   :`<div class="empty" style="min-height:auto;padding:30px 0"><div class="hint">
+      ${S.listQ?"검색 결과가 없습니다":S.listFilter==="done"?"아직 완료된 박스가 없습니다":"남은 박스가 없습니다 🎉"}</div></div>`}
+  ${list.length>60?`<div class="hint" style="text-align:center;padding:10px">…외 ${list.length-60}건 (검색으로 찾으세요)</div>`:""}`;
+}
+function bindProgress(){
+  document.querySelectorAll(".tab[data-f]").forEach(b=>b.onclick=()=>{
+    S.listFilter=b.dataset.f; render();
+  });
+  const q=$("listQ");
+  if(q)q.oninput=()=>{
+    S.listQ=q.value;
+    clearTimeout(S._qT);
+    S._qT=setTimeout(()=>{                       // 200ms 디바운스: 타이핑 중 재렌더 방지
+      const pos=q.selectionStart; render();
+      const q2=$("listQ"); if(q2){q2.focus();try{q2.setSelectionRange(pos,pos)}catch(e){}}
+    },200);
+  };
+  if(q)q.onkeydown=e=>e.stopPropagation();
+  const c=$("btnCsv"); if(c)c.onclick=exportCsv;
+  const sy=$("btnSyncP"); if(sy)sy.onclick=()=>pullProgress(false);
+}
+/** 토탈 피킹 결과 → WMS 전산 처리용 CSV
+    출발위치·상품·수량·처리결과(출고/이동/제자리)·시각을 한 줄씩 내보냅니다. */
+function exportPickCsv(){
+  const P=S.pick||S.lastPick; if(!P)return toast("피킹 내역이 없습니다","err");
+  const rows=[["분류","출발로케이션","지시로케이션","대체여부","구역","바코드","상품코드","상품명",
+               "확정수량","검수수량","예정수량","처리","도착로케이션",
+               "위치확인시각","첫스캔","마지막스캔","처리시각","입력방식","작업자"]];
+  P.lines.forEach(l=>{
+    const kind=l.step!=="DONE"?"미처리":l.moved?"이동":l.shipped?"출고(제자리)":l.kept?"제자리":"출고";
+    rows.push([l.cat||P.zone||"",l.location_code,l.orig_location||l.location_code,l.substituted?"대체":"",
+      l.zone||"",l.barcode||"",l.sku_code||"",l.product_name||"",
+      l.req,l.got,(l.plan===undefined?"":l.plan),kind,l.to_location||"",
+      hhmmss(l.from_at),hhmmss((l.scans||[])[0]),hhmmss((l.scans||[])[(l.scans||[]).length-1]),
+      hhmmss(l.to_at),(l.inputs||[]).join("/"),CFG.worker||""]);
+  });
+  downloadCsv(rows,"토탈피킹");
+  const mv=P.lines.filter(l=>l.moved).length, sb=P.lines.filter(l=>l.substituted).length;
+  toast(`CSV 내려받음`+(mv?` · 이동 ${mv}건`:"")+(sb?` · 대체 ${sb}건`:""),"ok");
+}
+function downloadCsv(rows,prefix){
+  const csv="\uFEFF"+rows.map(r=>r.map(v=>{
+    const t=String(v==null?"":v);
+    return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;
+  }).join(",")).join("\r\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  const d=new Date();
+  a.download=`${prefix}_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}_${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}.csv`;
+  a.style.display="none"; document.body.appendChild(a);
+  a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},3000);
+}
+window.exportPickCsv=exportPickCsv;
+
+/** 검수 기록을 엑셀에서 열 수 있는 CSV 로 내보냅니다 */
+function exportCsv(){
+  const rows=[["송장번호","주문번호","수취인","품목수","수량","상태","완료시각","작업자","오류","상품명","바코드","필요","검수","첫스캔","마지막스캔"]];
+  boxList().forEach(x=>{
+    const d=S.done.get(x.key);
+    if(d&&d.lines&&d.lines.length){
+      d.lines.forEach(l=>rows.push([x.invoice,x.order,x.receiver,x.items,x.qty,"완료",
+        hhmmss(d.at),d.worker,d.errors,l.name||"",l.barcode||l.sku||"",l.req,l.got,
+        hhmmss(l.first_at),hhmmss(l.last_at)]));
+    }else rows.push([x.invoice,x.order,x.receiver,x.items,x.qty,"미완료","","","","","","","","",""]);
+  });
+  downloadCsv(rows,"검수기록");
+  toast("CSV 를 내려받았습니다","ok");
+}
+
+/* ---------- 모드 A ---------- */
+function renderA(){
+  $("title").textContent="출고 검수"; chip("A","A · 출고검수");
+  if(!S.cur){
+    $("scanmsg").textContent="송장을 스캔하거나 번호를 입력하세요";
+    $("foot").style.display="none";
+    $("main").innerHTML=renderProgress();
+    bindProgress();
+    return;
+  }
+  const tot=S.cur.lines.reduce((a,l)=>a+l.req,0);
+  const got=S.cur.lines.reduce((a,l)=>a+Math.min(l.got,l.req),0);
+  const done=isCompleteA();
+  $("scanmsg").textContent=done?"검수 완료 — 완료 버튼을 누르세요":"상품 바코드를 스캔하세요";
+  const o=S.orders.get(S.cur.key)||{};
+  $("main").innerHTML=`<div class="card">
+    <div class="k">송장번호</div><div class="v mono">${esc(S.cur.invoice_no||"—")}</div>
+    <div class="grid2">
+      <div><div class="k">주문번호</div><div class="mono" style="font-weight:700">${esc(S.cur.order_no||"—")}</div></div>
+      <div><div class="k">품목</div><div style="font-weight:700">${S.cur.lines.length}종 / ${tot}개</div></div>
+    </div>
+    ${(o.receiver||o.shop||o.courier)?`<div class="grid2">
+      ${o.receiver?`<div><div class="k">수취인</div><div style="font-weight:700">${esc(o.receiver)}</div></div>`:""}
+      ${(o.shop||o.courier)?`<div><div class="k">${o.shop?"판매처":"택배사"}</div>
+        <div style="font-weight:700">${esc(o.shop||o.courier)}${o.shop&&o.courier?` <span style="color:var(--dim);font-weight:600;font-size:12px">· ${esc(o.courier)}</span>`:""}</div></div>`:""}
+    </div>`:""}
+    ${o.memo?`<div style="margin-top:10px;padding:9px 11px;background:#3a2f10;border-radius:9px;
+      font-size:13px;color:#fcd34d"><b>배송메모</b> · ${esc(o.memo)}</div>`:""}
+    ${bar(got,tot)}</div>`+S.cur.lines.map((l,i)=>lineHtml(l,i)).join("")+
+    (CFG.allowQty&&!done?`<p class="hint" style="text-align:center;margin:10px 0 0">
+      품목을 눌러 수량을 한 번에 입력할 수 있습니다 · 스캔은 언제든 그대로 됩니다</p>`:"");
+  $("foot").style.display="flex";
+  $("foot").innerHTML=`<button class="btn ghost" onclick="cancelA()">취소</button>
+    ${CFG.allowQty&&!done?`<button class="btn blue" onclick="openQtyPadA()">수량 입력 ⌨</button>`:""}
+    <button class="btn primary" ${done?"":"disabled"} onclick="commitA()">${done?"검수 완료 ✓":(tot-got)+"개 남음"}</button>`;
+}
+window.cancelA=async()=>{ if(await ask.confirm({title:"검수를 취소할까요?",
+  msg:"지금까지 스캔한 내용이 사라집니다.",danger:true,yes:"취소하기",no:"계속 검수"}))
+  {S.cur=null;setPhase("IDLE")} };
+window.commitA=commitA;
+
+/* ---------- 모드 B ---------- */
+function renderB(){
+  $("title").textContent="토탈 피킹";
+  const zc=(S.pick&&S.pick.zone)||(()=>{const c=[...new Set((S.pick?S.pick.lines:[]).map(l=>l.cat).filter(Boolean))];
+    return c.length===1?c[0]:""})();
+  chip("B",zc?("B · "+zc):"B · 토탈피킹");
+  const P=S.pick; if(!P)return;
+  const doneCnt=P.lines.filter(l=>P.three?l.step==="DONE":l.got>=l.req).length;
+  const totQ=P.lines.reduce((a,l)=>a+l.req,0), gotQ=P.lines.reduce((a,l)=>a+Math.min(l.got,l.req),0);
+  const L=curPickLine();
+  const allDone=doneCnt===P.lines.length;
+  const movedCnt=P.lines.filter(l=>l.moved).length;
+  $("scanmsg").textContent=allDone?"모든 로케이션 완료":
+    (L?`${L.location_code} — 상품 바코드를 스캔하세요`:"로케이션을 스캔하세요");
+
+  let html=`<div class="card" style="padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><div class="k">배치 진행</div>
+      <div style="font-weight:800;font-size:17px">${doneCnt} / ${P.lines.length} 로케이션</div></div>
+      <div style="text-align:right"><div class="k">총 수량</div>
+      <div class="mono" style="font-weight:800;font-size:17px">${gotQ} / ${totQ}</div></div>
+    </div>${bar(gotQ,totQ)}
+    ${movedCnt?`<div style="margin-top:10px;padding:9px 11px;background:#2a1740;
+      border-radius:9px;font-size:12.5px;color:#d8b4fe"><b>재고 이동 ${movedCnt}건</b>
+      — 피킹 완료 후 WMS 에 반영해야 합니다</div>`:""}
+    ${P.lines.some(l=>l.diff)?`<div style="margin-top:10px;padding:9px 11px;background:#3a2f10;
+      border-radius:9px;font-size:12.5px;color:#fcd34d"><b>예정과 다른 줄 ${P.lines.filter(l=>l.diff).length}건</b>
+      — 화면의 <b>확정 수량</b>대로 가져오세요</div>`:""}</div>`;
+
+  if(L&&!allDone){
+    const st=P.three?L.step:"ITEM";
+    const stepNo=st==="FROM"?1:st==="ITEM"?2:3;
+    html+=`
+    ${P.three?`<div class="steps">
+      <div class="stp ${stepNo===1?"on":stepNo>1?"ok":""}"><b>①</b> 출발 위치</div>
+      <div class="stp ${stepNo===2?"on":stepNo>2?"ok":""}"><b>②</b> 상품</div>
+      <div class="stp ${stepNo===3?"on":""}"><b>③</b> 처리</div>
+    </div>`:""}
+    <div class="locbig ${st==="TO"?"toStep":""}">
+      <div class="k">${st==="FROM"?"이 위치로 가세요":st==="ITEM"?"현재 위치 ✓":"가져온 물건 처리"}</div>
+      <div class="lc mono">${esc(L.location_code)}${L.substituted?`<span class="subtag">대체</span>`:""}</div>
+      ${L.substituted?`<div class="po" style="color:#fbbf24;font-size:12px">지시 자리 ${esc(L.orig_location)} 대신 여기서 가져옵니다</div>`:""}
+      ${L.zone?`<span class="zone">구역 ${esc(L.zone)}</span>`:""}
+      <div class="pn">${esc(L.product_name)}</div>
+      ${L.option_name?`<div class="po">${esc(L.option_name)}</div>`:""}
+      <div class="po mono" style="font-size:11px;margin-top:4px">${esc(L.barcode||L.sku_code)}${(L.sku_code&&L.barcode&&L.sku_code!==L.barcode)?" · "+esc(L.sku_code):""}</div>
+      <div class="qtyrow">
+        <div><div class="k">가져올 수량</div>
+          <div class="qtybig">${L.got}<small>/${L.req}</small></div></div>
+        <div class="spacer"></div>
+        <div style="text-align:right">
+          <span class="verified ${L.verified?"":"unverified"}">${L.verified?"✓ 품목 확인됨":"품목 미확인"}</span>
+          <div class="hint" style="margin-top:6px">${
+            L.diff?`<span style="color:#fcd34d">예정 ${L.plan}개 → <b>확정 ${L.req}개</b></span>`
+            :(L.plan!==undefined?`예정과 동일`:`주문 ${L.orderCount}건에 사용`)}</div>
+        </div>
+      </div>
+      ${P.three?`<div class="guide">${
+        st==="FROM"?`선반의 <b>로케이션 바코드</b>를 스캔하세요`
+        :st==="ITEM"?`이 자리에서 <b>상품 바코드</b>를 ${L.req-L.got}개 더 스캔하세요`
+        :`<b>출고 담기</b>를 누르거나, 다른 곳에 두려면 <b>그 위치를 스캔</b>하세요`}</div>`:""}
+    </div>`;
+  }
+
+  html+=`<div class="k" style="margin:16px 0 8px">피킹 동선 (${P.lines.length})</div>`+
+    P.lines.map((l,i)=>{
+      const fin=P.three?(l.step==="DONE"):(l.got>=l.req);
+      const st=(fin?"done":(i===P.idx?"active":(l.got>0?"partial":"")))+(l.diff&&!fin?" short":"");
+      return `<button class="line ${st} ${l.flash?"hit":""}" onclick="jumpPick(${i})">
+        <div class="chk">✓</div>
+        <div class="info">
+          <div class="nm mono" style="font-size:16px">${esc(l.location_code)}
+            ${l.zone?`<span style="font-size:11px;color:var(--dim);font-weight:600">· ${esc(l.zone)}</span>`:""}</div>
+          <div class="op">${esc(l.product_name)}</div>
+          <div class="bc">${esc(l.barcode||l.sku_code)}${l.inputs.some(x=>x.startsWith("MANUAL"))?' · <span style="color:#fcd34d">수량입력</span>':""}${l.diff?`<span class="shorttag">예정 ${l.plan} → ${l.req}</span>`:""}${
+  l.moved?`<span class="movetag">→ ${esc(l.to_location)}</span>`:l.kept?`<span class="kepttag">제자리</span>`:""}</div>
+        </div>
+        <div class="cnt"><b>${l.got}<span style="font-size:14px;opacity:.55">/${l.req}</span></b><small>개</small></div>
+      </button>`}).join("");
+  $("main").innerHTML=html;
+
+  $("foot").style.display="flex";
+  const st2=(L&&P.three)?L.step:"ITEM";
+  $("foot").innerHTML=allDone
+    ? `<button class="btn ghost" onclick="exitMode()">나가기</button>
+       <button class="btn blue" onclick="openMove()">🚚 이동 내역</button>
+       <button class="btn primary" onclick="commitB()">피킹 완료 ✓</button>`
+    : st2==="TO"
+    ? `<button class="btn ghost" onclick="backStep()">↩</button>
+       <button class="btn primary" onclick="shipLine()">📦 출고 담기</button>
+       <button class="btn" onclick="skipPick()">건너뛰기 ▸</button>`
+    : `<button class="btn ghost" onclick="exitMode()">나가기</button>
+       ${st2==="FROM"?`<button class="btn" onclick="openZone()" style="font-size:12.5px">🗂 구역</button>`:""}
+       ${st2==="FROM"||st2==="ITEM"?`<button class="btn" onclick="openAlt()" style="background:#3b2f0a;color:#fbbf24;border-color:#78350f">🔍 재고 없음</button>`:""}
+       ${CFG.allowQty&&st2==="ITEM"?`<button class="btn blue" onclick="openQtyPadB()">수량 입력 ⌨</button>`:""}
+       <button class="btn" onclick="skipPick()">건너뛰기 ▸</button>`;
+}
+window.backStep=()=>{const l=curPickLine(); if(!l)return;
+  if(l.step==="TO"){l.step="ITEM";toast("상품 스캔 단계로 돌아갑니다")}
+  else if(l.step==="ITEM"){l.step="FROM";l.from_at="";toast("위치 확인 단계로 돌아갑니다")}
+  render()};
+window.jumpPick=i=>{const l=S.pick.lines[i];
+  if(l.got>=l.req){toast("이미 완료된 로케이션입니다");return}
+  S.pick.idx=i;Sound.step();render()};
+window.skipPick=()=>{const P=S.pick;
+  for(let n=1;n<=P.lines.length;n++){const i=(P.idx+n)%P.lines.length;
+    if(P.lines[i].got<P.lines[i].req){P.idx=i;Sound.step();return render()}}
+  toast("남은 로케이션이 없습니다")};
+window.openQtyPadB=openQtyPadB;
+window.commitB=commitB;
+window.exitMode=async()=>{if(await ask.confirm({title:"모드를 나갈까요?",
+  msg:"진행 내역은 저장되지 않습니다.",danger:true,yes:"나가기",no:"계속"})){
+  S.mode=null;S.pick=null;S.cur=null;S.sort=null;setPhase("IDLE")}};
+
+/* ---------- 모드 C ---------- */
+function renderC(){
+  $("title").textContent="분배 (DAS)"; chip("C","C · 분배");
+  const T=S.sort;
+  if(!T){
+    $("scanmsg").textContent="상품 바코드를 스캔하세요";
+    $("foot").style.display="flex";
+    $("foot").innerHTML=`<button class="btn ghost" onclick="exitMode()">나가기</button>`;
+    $("main").innerHTML=`
+      <div class="empty"><div class="big">⊞</div>
+      <h2>상품 대기 중</h2>
+      <div>손에 든 상품을 위 <b>상품</b> 칸에 스캔하거나 입력하면<br>어느 주문에 몇 개 넣을지 알려드립니다
+      <div class="hint" style="margin-top:12px">대상 상품 ${new Set(S.rows.map(r=>r.sku_code)).size}종</div></div></div>`;
+    return;
+  }
+  const tot=T.lines.reduce((a,l)=>a+l.req,0),got=T.lines.reduce((a,l)=>a+Math.min(l.got,l.req),0);
+  $("scanmsg").textContent="배분할 주문의 송장을 스캔하세요";
+  $("main").innerHTML=`<div class="card">
+    <div class="k">분배 중인 상품</div>
+    <div class="v">${esc(T.name)}</div>
+    ${T.option?`<div class="op" style="color:var(--dim);font-size:13px">${esc(T.option)}</div>`:""}
+    <div class="mono hint" style="margin-top:4px">${esc(T.sku)}</div>
+    ${bar(got,tot)}
+    <div class="progtxt"><span>${T.lines.length}개 주문에 분배</span></div>
+  </div>`+T.lines.map(l=>{
+    const st=l.got>=l.req?"done":(l.got>0?"partial":"");
+    return `<button class="line ${st} ${l.flash?"hit":""}" onclick="padC('${l.key}')">
+      <div class="chk">✓</div>
+      <div class="info">
+        ${l.receiver?`<div class="nm" style="font-size:16px">${esc(l.receiver)}
+          ${l.shop?`<span style="font-size:11px;color:var(--dim);font-weight:600">· ${esc(l.shop)}</span>`:""}</div>`:""}
+        <div class="${l.receiver?"op":"nm"} mono" style="font-size:${l.receiver?13:15}px">${esc(l.invoice_no||l.order_no)}</div>
+        ${l.invoice_no&&l.order_no?`<div class="bc mono">${esc(l.order_no)}</div>`:""}</div>
+      <div class="cnt"><b>${l.got}<span style="font-size:14px;opacity:.55">/${l.req}</span></b><small>개</small></div>
+    </button>`}).join("");
+  $("foot").style.display="flex";
+  $("foot").innerHTML=`<button class="btn ghost" onclick="exitMode()">나가기</button>
+    <button class="btn" onclick="S.sort=null;render()">다른 상품 ▸</button>`;
+}
+window.padC=key=>{
+  if(!CFG.allowQty)return;
+  const t=S.sort.lines.find(l=>l.key===key); if(!t||t.got>=t.req)return;
+  openQtyPadC(t);
+};
+
+/* =========================================================================
+ *  입력줄 — 스캐너와 키보드를 동시에 받습니다
+ *    · 포커스가 입력칸에 있으면: 스캐너가 친 글자도 여기 들어오고 Enter 로 처리
+ *    · 포커스가 없으면: document 리스너가 스캔을 잡음
+ *    → 어느 쪽이든 동작하므로 PC/PDA/폰 모두 같은 방식으로 씁니다.
+ * ========================================================================= */
+function entryContext(){
+  if(!S.mode)return null;
+  if(S.phase==="ERROR_HOLD")return {label:"오류",ph:CFG.pinOnError?"관리자 PIN 해제 후 사용":"확인을 눌러 계속하세요",lock:true};
+  if(S.mode==="A")
+    return S.cur?{label:"상품",ph:"상품 바코드 · 상품코드"}
+                :{label:"송장",ph:"송장번호 · 주문번호"};
+  if(S.mode==="B"){
+    const L=curPickLine();
+    if(S.pick&&S.pick.three&&L){
+      if(L.step==="FROM")return {label:"위치",ph:`${L.location_code} 로케이션 바코드`};
+      if(L.step==="ITEM")return {label:"상품",ph:"이 자리의 상품 바코드"};
+      return {label:"처리",ph:"옮길 위치 스캔 (출고면 아래 버튼)"};
+    }
+    return {label:"상품",ph:"상품 바코드 · 로케이션 코드"};
+  }
+  return S.sort?{label:"송장",ph:"배분할 주문의 송장번호"}
+               :{label:"상품",ph:"상품 바코드 · 상품코드"};
+}
+function renderEntry(){
+  const c=entryContext(), bar=$("entrybar");
+  if(!c){bar.className="";return}
+  bar.className="on"+(c.lock?" locked":"");
+  $("entryLabel").textContent=c.label;
+  const el=$("entry");
+  el.placeholder=c.ph+" 입력 후 Enter";
+  // 넓은 화면(PC)에서는 바로 타이핑할 수 있게 포커스를 잡아둔다.
+  // 폰에서는 키보드가 화면을 덮어버리므로 하지 않는다.
+  if(!c.lock&&window.innerWidth>=700&&document.activeElement!==el&&
+     !$("cfg").classList.contains("on")&&!$("map").classList.contains("on")&&
+     !$("pad").classList.contains("on")) el.focus();
+}
+(function bindEntry(){
+  const el=$("entry");
+  el.addEventListener("keydown",e=>{
+    e.stopPropagation();                       // document 스캐너 리스너와 충돌 방지
+    if(e.key==="Enter"){e.preventDefault();entryGo()}
+    if(e.key==="Escape"){el.value=""}
+  });
+  $("entryGo").onclick=entryGo;
+})();
+function entryGo(){
+  const el=$("entry"); const v=el.value.trim();
+  if(!v)return;
+  el.value="";
+  onScan(v);
+  if(window.innerWidth>=700)el.focus();        // PC 는 연속 입력을 위해 포커스 유지
+}
+window.entryGo=entryGo;
+/* 구버전 호환 */
+function bindManual(){}
+window.manualGo=entryGo;
+
+/* ---------- 공통 렌더 헬퍼 ---------- */
+function bar(got,tot){const p=tot?Math.round(got/tot*100):0;
+  return `<div class="progbar"><div class="progfill" style="width:${p}%"></div></div>
+  <div class="progtxt"><span>${got} / ${tot} 개</span><span>${p}%</span></div>`}
+function lineHtml(l,i){
+  const st=l.got>=l.req?"done":(l.got>0?"partial":"");
+  const tap=(CFG.allowQty&&S.mode==="A"&&i!==undefined&&l.got<l.req)
+    ?` onclick="openQtyPadA(${i})" style="cursor:pointer"`:"";
+  return `<div class="line ${st} ${l.flash?"hit":""}"${tap}>
+    <div class="chk">✓</div>
+    <div class="info"><div class="nm">${esc(l.product_name)}</div>
+      ${l.option_name?`<div class="op">${esc(l.option_name)}</div>`:""}
+      <div class="bc mono">${esc(l.sku_code)}${l.barcode?" · "+esc(l.barcode):""}</div></div>
+    <div class="cnt"><b>${l.got}<span style="font-size:14px;opacity:.55">/${l.req}</span></b><small>개</small></div>
+  </div>`}
+function chip(m,label){
+  const c=$("modeChip"); c.style.display=""; c.className="modechip "+m; c.textContent=label;
+  $("btnHome").style.display="";
+}
+function renderHeader(){
+  const b=$("snapBadge");
+  if(!navigator.onLine){b.className="badge off";b.textContent="오프라인";return}
+  const at=Math.max(S.snapshotAt||0,S.wmsAt||0);
+  if(!at){b.className="badge";b.textContent="데이터 없음";return}
+  const min=Math.floor((Date.now()-at)/60000);
+  b.textContent=min<1?"방금 갱신":`${min}분 전`;
+  b.className="badge "+(min<30?"fresh":min<120?"stale":"old");
+}
+function renderQueue(){
+  const q=$("qbadge"), n=S.queue.length+S.plQueue.length+S.errQueue.length;
+  if(n){q.style.display="";q.textContent="미전송 "+n;q.className="badge stale"}
+  else q.style.display="none";
+}
+setInterval(()=>{ if(document.visibilityState==="visible")renderHeader() },60000);
+
+/* =========================================================================
+ *  카메라 스캔
+ *   - 1순위: BarcodeDetector (안드로이드 크롬 내장 — 가장 빠르고 가벼움)
+ *   - 2순위: ZXing (아이폰 사파리·구형 브라우저용, 처음 켤 때만 내려받음)
+ *   - 최후: 화면의 [⌨ 번호 직접 입력] — 바코드가 찢어졌을 때도 진행 가능
+ * ========================================================================= */
+let camStream=null,camLoop=null,camTrack=null,camTorchOn=false,ZX=null,zxLoading=null;
+
+/* ── 오래 걸리는 작업의 진행 표시 ──
+   4,000행짜리 파일은 저사양 PDA 에서 10초 넘게 걸립니다.
+   아무 표시가 없으면 "먹통됐다"고 판단해 다시 누르는 사고가 납니다. */
+const Busy={
+  on(title,sub){ $("busyTtl").textContent=title||"처리 중";
+    $("busySub").textContent=sub||""; this.set(0); $("busy").classList.add("on") },
+  sub(t){ $("busySub").textContent=t||"" },
+  set(p){ const v=Math.max(0,Math.min(100,Math.round(p)));
+    $("busyFill").style.width=v+"%"; $("busyPct").textContent=v+"%" },
+  off(){ $("busy").classList.remove("on") }
+};
+/* 화면이 갱신될 틈을 줍니다 (긴 반복문을 잘게 쪼갤 때) */
+const breathe=()=>new Promise(r=>setTimeout(r,0));
+
+/* ── 공용 확인·입력창 ──
+   브라우저 기본 prompt/confirm 은 PDA 에서 글씨가 작고, 일부 웹뷰는 아예 막습니다.
+   화면 안에서 크게 눌리는 창으로 대체합니다. 항상 Promise 를 돌려줍니다.
+     await ask.confirm({title,msg,yes,danger})        → true / false
+     await ask.text({title,msg,value,ph,multi})       → 문자열 / null
+     await ask.pick({title,msg,options:[{v,label,sub}]}) → 값 / null
+     await ask.alert({title,msg})                      → true          */
+const ask=(()=>{
+  let done=null;
+  const close=v=>{ $("ask").classList.remove("on"); $("askIn").innerHTML="";
+    const d=done; done=null; if(d)d(v) };
+  $("askNo").onclick=()=>close(null);
+  $("ask").addEventListener("click",e=>{ if(e.target.id==="ask")close(null) });
+  document.addEventListener("keydown",e=>{
+    if(!$("ask").classList.contains("on"))return;
+    if(e.key==="Escape"){e.stopPropagation();close(null)}
+  },true);
+  function open(o){
+    return new Promise(res=>{
+      done=res;
+      $("askTtl").textContent=o.title||"";
+      $("askMsg").innerHTML=o.msg||"";
+      $("askMsg").style.display=o.msg?"":"none";
+      $("askIn").innerHTML=o.body||"";
+      $("askNo").style.display=o.noCancel?"none":"";
+      $("askNo").textContent=o.no||"취소";
+      $("askYes").style.display=o.hideYes?"none":"";
+      $("askYes").textContent=o.yes||"확인";
+      $("askYes").className="btn "+(o.danger?"danger":"primary");
+      $("ask").classList.add("on");
+      if(o.after)setTimeout(()=>o.after(close),40);
+      else $("askYes").onclick=()=>close(true);
+    });
+  }
+  return {
+    confirm:o=>open(Object.assign({},o,{after:null})),
+    alert:o=>open(Object.assign({},o,{noCancel:true,yes:o.yes||"확인"})),
+    text(o){
+      const multi=!!o.multi;
+      const el=multi
+        ? '<textarea id="askField" placeholder="'+esc(o.ph||"")+'"></textarea>'
+        : '<input id="askField" type="'+(o.password?"password":"text")+'" '+
+          (o.numeric?'inputmode="numeric" ':'')+'placeholder="'+esc(o.ph||"")+'" autocomplete="off">';
+      return open(Object.assign({},o,{body:el,after(close){
+        const f=$("askField"); if(!f)return;
+        f.value=o.value||"";
+        try{ f.focus(); if(!multi)f.select() }catch(e){}
+        f.addEventListener("keydown",e=>{
+          e.stopPropagation();
+          if(e.key==="Enter"&&!multi){e.preventDefault();close(f.value)}
+        });
+        $("askYes").onclick=()=>close(f.value);
+      }}));
+    },
+    pick(o){
+      const body='<div class="opts">'+(o.options||[]).map((x,i)=>
+        '<button data-i="'+i+'"><b>'+esc(x.label)+'</b>'+
+        (x.sub?'<span>'+esc(x.sub)+'</span>':'')+'</button>').join("")+'</div>';
+      return open(Object.assign({},o,{body,hideYes:true,after(close){
+        document.querySelectorAll("#askIn .opts button").forEach(b=>
+          b.onclick=()=>close((o.options[+b.dataset.i]||{}).v));
+      }}));
+    }
+  };
+})();
+
+/* ── 엑셀 라이브러리 지연 로딩 ──
+   전체 용량의 82% 를 차지하는데, 실제로 쓰는 사람은 파일을 올리는 관리자뿐입니다.
+   작업자 기기는 이걸 아예 받지 않아 앱이 훨씬 빨리 뜹니다.
+   순서: 이미 있음 → 같은 폴더의 파일 → CDN 2곳 */
+let xlsxLoading=null;
+async function ensureXLSX(){
+  if(typeof XLSX!=="undefined")return XLSX;
+  if(xlsxLoading)return xlsxLoading;
+  const here=(location.protocol==="file:")?"":(location.pathname.replace(/[^/]*$/,""));
+  const urls=[here+"xlsx.full.min.js",
+              "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+              "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"];
+  xlsxLoading=(async()=>{
+    for(const u of urls){
+      if(!u)continue;
+      try{ await loadScript_(u); if(typeof XLSX!=="undefined")return XLSX }catch(e){}
+    }
+    throw new Error("XLSX");
+  })();
+  try{ return await xlsxLoading } finally{ xlsxLoading=null }
+}
+
+function loadScript_(src){
+  return new Promise((res,rej)=>{
+    const el=document.createElement("script");
+    el.src=src; el.async=true;
+    el.onload=()=>res(); el.onerror=()=>rej(new Error("load fail"));
+    document.head.appendChild(el);
+  });
+}
+/* ZXing 은 필요할 때만 내려받습니다 (앱을 가볍게 유지) */
+async function ensureZXing(){
+  if(window.ZXing)return window.ZXing;
+  if(zxLoading)return zxLoading;
+  $("camSub").textContent="바코드 인식기 준비 중...";
+  const urls=["https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js",
+              "https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"];
+  zxLoading=(async()=>{
+    for(const u of urls){
+      try{ await loadScript_(u); if(window.ZXing)return window.ZXing }catch(e){}
+    }
+    throw new Error("ZXING");
+  })();
+  try{ return await zxLoading } finally{ zxLoading=null }
+}
+
+function camAccept(v){
+  const now=Date.now();
+  if(v===camAccept.last&&now-camAccept.at<1200)return;   // 같은 코드 연속 인식 방지
+  camAccept.last=v; camAccept.at=now;
+  $("camHit").textContent=v;
+  setTimeout(()=>{ if($("camHit").textContent===v)$("camHit").textContent="" },1500);
+  onScan(v);
+}
+camAccept.last=""; camAccept.at=0;
+
+async function openCam(){
+  $("camHit").textContent=""; $("camSub").textContent="";
+  $("cam").classList.add("on");
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}});
+  }catch(e){
+    $("cam").classList.remove("on");
+    return toast("카메라 권한이 필요합니다 — 브라우저 설정에서 허용해 주세요","err");
+  }
+  const v=$("vid"); v.srcObject=camStream;
+  try{ await v.play() }catch(e){}
+  camTrack=camStream.getVideoTracks()[0]; camTorchOn=false;
+  const caps=(camTrack&&camTrack.getCapabilities)?camTrack.getCapabilities():{};
+  $("camTorch").style.display=("torch" in caps)?"":"none";
+  $("camTorch").classList.remove("on");
+
+  // ① 내장 BarcodeDetector
+  if("BarcodeDetector" in window){
+    try{
+      const fmts=await BarcodeDetector.getSupportedFormats();
+      const want=["ean_13","code_128","code_39","ean_8","upc_a","upc_e","itf","codabar","qr_code"]
+        .filter(f=>fmts.indexOf(f)>=0);
+      const det=new BarcodeDetector({formats:want.length?want:undefined});
+      $("camSub").textContent="빠른 인식 모드";
+      camLoop=setInterval(async()=>{
+        try{ const c=await det.detect(v); if(c&&c.length)camAccept(c[0].rawValue) }catch(e){}
+      },200);
+      return;
+    }catch(e){ /* 아래 ZXing 으로 */ }
+  }
+  // ② ZXing 폴백 (아이폰 등)
+  try{
+    const Z=await ensureZXing();
+    const hints=new Map();
+    hints.set(Z.DecodeHintType.TRY_HARDER,true);
+    const reader=new Z.BrowserMultiFormatReader(hints,300);
+    $("camSub").textContent="호환 인식 모드";
+    reader.decodeFromVideoElement(v,(r)=>{ if(r)camAccept(r.getText()) });
+    camLoop=setInterval(()=>{},1000);      // closeCam 이 정리할 수 있게
+    camStream.__reader=reader;
+  }catch(e){
+    $("camSub").textContent="";
+    $("camTop").firstChild.textContent="이 브라우저는 카메라 인식을 지원하지 않습니다";
+    toast("카메라 인식을 쓸 수 없습니다 — [⌨ 번호 직접 입력] 을 쓰세요","err");
+  }
+}
+function closeCam(){
+  clearInterval(camLoop); camLoop=null;
+  try{ if(camStream&&camStream.__reader)camStream.__reader.reset() }catch(e){}
+  if(camTrack&&camTorchOn){try{camTrack.applyConstraints({advanced:[{torch:false}]})}catch(e){}}
+  if(camStream)camStream.getTracks().forEach(t=>t.stop());
+  camStream=null; camTrack=null; camTorchOn=false;
+  $("cam").classList.remove("on");
+}
+/* 어두운 창고용 조명 */
+$("camTorch").onclick=async()=>{
+  if(!camTrack)return;
+  camTorchOn=!camTorchOn;
+  try{ await camTrack.applyConstraints({advanced:[{torch:camTorchOn}]});
+    $("camTorch").classList.toggle("on",camTorchOn);
+  }catch(e){ camTorchOn=false; toast("이 기기는 조명 제어를 지원하지 않습니다","err") }
+};
+/* 바코드가 찢어졌을 때 — 아래 인쇄된 숫자를 직접 입력 */
+$("camType").onclick=async()=>{
+  const v=await ask.text({title:"번호 직접 입력",
+    msg:"바코드 아래 <b>인쇄된 번호</b>를 그대로 입력하세요.",ph:"8809527903816",yes:"입력"});
+  if(v&&v.trim())camAccept(v.trim());
+};
+
+/* ---------- Wake Lock ---------- */
+let wl=null;
+async function keepAwake(){try{if("wakeLock" in navigator)wl=await navigator.wakeLock.request("screen")}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")keepAwake()});
+
+/* ---------- 이벤트 ---------- */
+$("btnHome").onclick=async()=>{if(await ask.confirm({title:"모드 선택으로 돌아갈까요?",
+  msg:"진행 중인 검수·분배 내역은 사라집니다.<br>토탈 피킹은 저장되어 이어서 할 수 있습니다.",
+  yes:"돌아가기",no:"계속"})){
+  S.mode=null;S.cur=null;S.pick=null;S.sort=null;setPhase("IDLE")}};
+function applyCfg(){
+  CFG.worker=$("cfgWorker").value.trim();
+  const na=$("cfgApi").value.trim();
+  if(na!==CFG.api){CFG.api=na;CFG.apiSrc=na?"manual":"";}   // 손으로 고쳤으면 기본값이 덮어쓰지 않게
+
+  CFG.shareKey=$("cfgKey").value;CFG.stripPat=$("cfgStrip").value.trim();CFG.autoSync=$("cfgAutoSync").checked;
+  CFG.pin=$("cfgPin").value||"1234";CFG.pinOnError=$("cfgPinErr").checked;CFG.autoSubmit=$("cfgAuto").checked;
+  CFG.sound=$("cfgSound").checked;CFG.allowQty=$("cfgQty").checked;
+  CFG.allowQtyOnly=$("cfgQtyOnly").checked;CFG.threeStep=$("cfg3").checked;
+  saveCfg();
+}
+$("btnCfg").onclick=()=>{
+  $("cfgWorker").value=CFG.worker;$("cfgApi").value=CFG.api;$("cfgKey").value=CFG.shareKey;$("cfgStrip").value=CFG.stripPat||"";
+  $("cfgAutoSync").checked=CFG.autoSync;$("cfgPin").value=CFG.pin;$("cfgPinErr").checked=!!CFG.pinOnError;
+  $("cfgAuto").checked=CFG.autoSubmit;$("cfgSound").checked=CFG.sound;
+  $("cfgQty").checked=CFG.allowQty;$("cfgQtyOnly").checked=CFG.allowQtyOnly;
+  $("cfg3").checked=CFG.threeStep;
+  $("cfgStat").textContent=Store.healthy?"":"⚠ 이 브라우저는 저장소가 막혀 설정이 유지되지 않습니다";
+  $("cfg").classList.add("on")};
+$("cfgClose").onclick=()=>{
+  const before=CFG.api;
+  applyCfg();$("cfg").classList.remove("on");toast("저장되었습니다","ok");render();
+  // 공유 주소를 새로 넣었으면 바로 받아온다 (작업자가 "받기"를 몰라도 되게)
+  if(CFG.api&&CFG.api!==before)pullServer();
+};
+$("btnDemo").onclick=demo;
+$("btnSync").onclick=()=>{applyCfg();pullServer()};
+$("btnPublish").onclick=()=>{applyCfg();publishServer()};
+$("btnPing").onclick=async()=>{
+  applyCfg();
+  if(!CFG.api)return $("cfgStat").textContent="⚠ 공유 서버 주소를 먼저 입력하세요";
+  $("cfgStat").textContent="확인 중...";
+  try{
+    const j=await api("ping");
+    $("cfgStat").textContent=j.ok
+      ?`✅ 연결 성공 · 서버 ${j.ver} · 공유중 ${j.rows||0}행 · 인증 ${j.auth==="required"?"필요":"없음"}`
+      :`❌ 응답 오류: ${j.error||"알 수 없음"}`;
+    S.serverOk=!!j.ok;
+  }catch(e){
+    S.serverOk=false; S.lastError=errMsg(e);
+    $("cfgStat").innerHTML="❌ "+esc(errMsg(e)).replace(/\n/g,"<br>")+
+      "<br><br><b>확인 순서</b><br>"+
+      "① 배포 &gt; 배포 관리 &gt; ✏️ → <b>액세스 권한: 모든 사용자</b><br>"+
+      "② 코드를 고쳤다면 <b>버전: 새 버전</b> 으로 다시 배포<br>"+
+      "③ 아래 [주소 직접 열기] 로 브라우저에서 JSON 이 보이는지 확인";
+  }
+  render();
+};
+$("btnOpen").onclick=()=>{
+  applyCfg();
+  if(!CFG.api)return $("cfgStat").textContent="⚠ 주소를 먼저 입력하세요";
+  window.open(CFG.api+"?action=ping","_blank");
+};
+/* 🩺 진단 — "안 된다" 를 한 화면으로 좁혀줍니다 */
+$("btnHist").onclick=()=>{$("cfg").classList.remove("on");openHist()};
+$("btnZone").onclick=()=>{$("cfg").classList.remove("on");editCats()};
+
+/* 분류 이름 관리 — 대화물·소화물·천일·쿠팡·수출 … */
+async function editCats(){
+  const cur=(CFG.cats||[]).join("\n");
+  const v=await ask.text({title:"🗂 분류 설정",multi:true,value:cur,yes:"저장",
+    msg:"토탈 피킹 파일에 붙일 분류를 <b>한 줄에 하나씩</b> 적으세요.<br>"+
+        "파일을 올릴 때 여기 적은 이름 중에서 고르게 됩니다.",
+    ph:"대화물\n소화물\n천일\n쿠팡\n수출"});
+  if(v===null)return;
+  const list=v.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const uniq=[]; list.forEach(x=>{ if(uniq.indexOf(x)<0)uniq.push(x) });
+  CFG.cats=uniq; saveCfg();
+  toast(uniq.length?`분류 ${uniq.length}개 저장: ${uniq.join(" · ")}`:"분류를 모두 지웠습니다","ok");
+  render();
+}
+window.editCats=editCats;
+$("btnDiag").onclick=async()=>{
+  applyCfg();
+  const L=[];
+  const row=(k,v,bad)=>L.push(`<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #1e293b">
+    <b style="flex:0 0 108px;color:${bad?"#fca5a5":"#94a3b8"}">${k}</b><span>${v}</span></div>`);
+  row("앱 버전", $("verBadge").textContent);
+  row("작업자", CFG.worker||"<b style='color:#fca5a5'>미입력</b>", !CFG.worker);
+  row("서버 주소", CFG.api?("…"+esc(CFG.api.slice(-18))):"<b style='color:#fca5a5'>없음</b>", !CFG.api);
+  row("공유키", CFG.shareKey?"설정됨":"없음");
+  row("인터넷", navigator.onLine?"연결됨":"<b style='color:#fca5a5'>끊김</b>", !navigator.onLine);
+  row("출고 데이터", S.rows.length+"행 / "+(S.orders.size-S.aliasKeys.size)+"박스",!S.rows.length);
+  row("토탈 피킹", S.wmsRows.length+"줄", !S.wmsRows.length);
+  row("재고 색인", S.stockIdx.size+"품목");
+  row("피킹 분류", (()=>{const m={};S.wmsRows.forEach(w=>{const c=w.cat||"(없음)";m[c]=(m[c]||0)+1});
+    const k=Object.keys(m);return k.length?k.map(c=>c+" "+m[c]+"줄").join(" · "):"—"})());
+  row("완료 기록", S.done.size+"건");
+  row("피킹 이력", S.pickHist.length+"회 보관"+(S.pickHist.filter(h=>!h.sent).length?` · 미전송 ${S.pickHist.filter(h=>!h.sent).length}`:""));
+  row("전송 대기", `검수 ${S.queue.length} · 피킹 ${S.plQueue.length} · 오류 ${S.errQueue.length}`,
+      (S.queue.length+S.plQueue.length+S.errQueue.length)>0);
+  row("카메라 인식", ("BarcodeDetector" in window)?"내장 지원 ✓":"ZXing 내려받기 필요");
+  row("저장소", Store.healthy?"정상":"<b style='color:#fca5a5'>차단됨</b>", !Store.healthy);
+  $("cfgStat").innerHTML=L.join("")+"<div style='padding:6px 0'>서버 확인 중…</div>";
+  if(!CFG.api){ $("cfgStat").innerHTML=L.join("")+
+    "<div style='padding:8px 0;color:#fca5a5'>서버 주소가 없어 공유가 안 됩니다.</div>"; return }
+  let sv="";
+  try{
+    const j=await api("ping");
+    sv=j.ok?`✅ 서버 <b>${esc(String(j.ver))}</b> · 공유중 출고 ${j.rows||0}행 · 피킹 ${j.pick===undefined?"<b style='color:#fbbf24'>미지원(구버전 코드)</b>":j.pick+"줄"}`
+           :`❌ ${esc(j.error||"응답 오류")}`;
+  }catch(e){ sv="❌ "+esc(errMsg(e)).replace(/\n/g,"<br>") }
+  const hint = /미지원/.test(sv)
+    ? "<br><b style='color:#fbbf24'>→ 구글시트 Code.gs 를 v1.0 으로 교체하고 [새 버전]으로 다시 배포하세요.</b>"
+    : (!/✅/.test(sv) ? "<br><b style='color:#fca5a5'>→ 배포 관리에서 웹 앱 / 액세스: 모든 사용자 를 확인하세요.</b>" : "");
+  $("cfgStat").innerHTML=L.join("")+"<div style='padding:8px 0;line-height:1.6'>"+sv+hint+"</div>";
+};
+
+/* 초대 링크 — 작업자에게 이 링크만 보내면 설정이 자동으로 들어갑니다 */
+$("btnLink").onclick=()=>{
+  applyCfg();
+  if(!CFG.api)return $("cfgStat").textContent="⚠ 공유 서버 주소를 먼저 입력하세요";
+  if(location.protocol==="file:")
+    return $("cfgStat").textContent="⚠ 파일로 연 상태에서는 링크를 만들 수 없습니다 (GitHub Pages 주소에서 눌러주세요)";
+  const base=location.origin+location.pathname;
+  let q="#api="+encodeURIComponent(CFG.api);           // # → 서버 로그에 안 남습니다
+  if(CFG.shareKey)q+="&key="+encodeURIComponent(CFG.shareKey);
+  const link=base+q;
+  const done=ok=>{
+    $("cfgStat").innerHTML=(ok?"✅ 초대 링크를 복사했습니다. 작업자에게 보내세요.":"아래 주소를 길게 눌러 복사하세요.")+
+      "<br><textarea readonly rows='3' style='width:100%;font-size:11px;margin-top:6px;background:#0b1220;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px'>"+esc(link)+"</textarea>"+
+      (CFG.shareKey?"<br><b style='color:#fca5a5'>⚠ 이 링크에는 공유키가 들어 있습니다. 사내 인원에게만 보내세요.</b>":"");
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(link).then(()=>done(true)).catch(()=>done(false));
+  else done(false);
+};
+$("btnCam").onclick=openCam;
+$("camClose").onclick=closeCam;
+
+function bindDrop(dropId,fileId){
+  const d=$(dropId);
+  d.onclick=()=>$(fileId).click();
+  $(fileId).onchange=e=>{if(e.target.files.length){readFiles2(e.target.files);e.target.value=""}};
+  ["dragenter","dragover"].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.add("over")}));
+  ["dragleave","drop"].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.remove("over")}));
+  d.addEventListener("drop",e=>{if(e.dataTransfer.files.length)readFiles2(e.dataTransfer.files)});
+}
+bindDrop("drop","file");
+// 화면 아무 데나 끌어놓아도 받는다 (현장에서 설정을 못 찾는 사고 방지) — 종류는 다음 화면에서 고름
+["dragenter","dragover"].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
+document.addEventListener("drop",e=>{
+  e.preventDefault();
+  if($("map").classList.contains("on")||$("fq").classList.contains("on"))return;
+  const fl=e.dataTransfer&&e.dataTransfer.files;
+  if(fl&&fl.length&&!$("cfg").classList.contains("on"))readFiles2(fl);
+});
+/* 🔄 초기화 — 3단계. 관리자 PIN 필요 */
+$("btnReset").onclick=async()=>{
+  const L=await ask.pick({title:"🔄 초기화",msg:"무엇을 초기화할까요?",options:[
+    {v:"1",label:"진행상황만",sub:"완료표시·시간만 지움 · 출고/피킹 데이터는 유지"},
+    {v:"2",label:"진행상황 + 데이터",sub:"새 날 시작 — 가장 많이 씁니다 · 시트도 비울지 이어서 물어봄"},
+    {v:"3",label:"전부 초기화",sub:"설정·매핑·전송대기·피킹이력까지 · 서버주소는 자동 복구"}]});
+  if(!L)return;
+  const pin=await ask.text({title:"관리자 확인",msg:"관리자 PIN 을 입력하세요",
+    password:true,numeric:true,yes:"확인"});
+  if(pin===null)return;
+  if(pin!==String(CFG.pin))return toast("PIN이 맞지 않습니다","err");
+  const wait=S.queue.length+S.plQueue.length+S.errQueue.length;
+  const warn=wait
+    ? `<br><br><span class="warn">⚠ 아직 서버로 못 보낸 기록이 ${wait}건 있습니다.`+
+      (L==="3"?" 3번은 이것도 지웁니다." : " 이 기록은 유지됩니다.")+`</span>`
+    : "";
+  if(!await ask.confirm({title:"정말 초기화할까요?",danger:true,yes:"초기화",
+    msg:{1:"진행상황(완료표시)을 지웁니다.",2:"진행상황과 적재된 데이터를 모두 지웁니다.",
+         3:"설정을 포함해 이 기기를 초기 상태로 되돌립니다.<br><span class=\"warn\">피킹 이력도 함께 지워집니다.</span>"}[L]+warn}))return;
+
+  if(L==="1"){ const n=resetProgress(); toast(`진행상황 ${n}건을 지웠습니다`,"ok"); }
+  else if(L==="2"){ resetData(); toast("진행상황과 데이터를 초기화했습니다","ok"); }
+  else{
+    const keepApi=CFG.apiSrc==="manual"?CFG.api:"", keepKey=CFG.shareKey;
+    resetData();
+    S.queue=[]; S.errQueue=[]; S.plQueue=[];
+    Store.set("queue",[]); Store.set("errq",[]); Store.set("plq",[]); Store.set("pick",null);
+    S.pickHist=[]; Store.set("pickHist",[]);
+    Store.set("map_orders",null); Store.set("map_pick",null); Store.set("map_loc",null);
+    Store.set("cfg",null);
+    Object.assign(CFG,{worker:"",api:keepApi,apiSrc:keepApi?"manual":"",shareKey:keepKey,
+      pin:"1234",autoSubmit:true,sound:true,allowQty:true,allowQtyOnly:false,
+      autoSync:true,threeStep:true});
+    autoApi({});                       // 앱에 박힌 서버주소는 다시 채워넣는다
+    toast("전체 초기화 완료 — 서버주소는 자동 복구됐습니다","ok");
+  }
+  $("cfg").classList.remove("on"); render();
+  if(L!=="1")askServerReset(L);      // 2·3번은 구글시트도 비울지 물어봅니다
+};
+
+/* 구글시트까지 초기화 — 다른 작업자에게도 영향이 가므로 따로 확인받습니다 */
+async function askServerReset(level){
+  if(!CFG.api)return;
+  const wait=S.queue.length+S.plQueue.length+S.errQueue.length;
+  if(wait){
+    if(!await ask.confirm({title:"먼저 전송할까요?",yes:"전송 시도",
+      msg:`<span class="warn">⚠ 아직 서버로 못 보낸 기록이 ${wait}건 있습니다.</span><br>`+
+        `지금 구글시트를 비우면 이 기록이 갈 곳이 없어집니다.<br><br>`+
+        `[취소]하면 시트는 그대로 둡니다.`}))return;
+    flushQueue(); flushPickLines(); flushErrors();
+    await new Promise(r=>setTimeout(r,2500));
+    if(S.queue.length+S.plQueue.length+S.errQueue.length){
+      await ask.alert({title:"전송이 끝나지 않았습니다",
+        msg:"인터넷을 확인한 뒤 다시 시도하세요.<br><b>시트는 건드리지 않았습니다.</b>"});
+      return;
+    }
+  }
+  const msg="· 검수·오류·피킹 기록 → <b>ARCHIVE_ 탭으로 이동</b> (삭제 아님)<br>"+
+    "· 출고 데이터·피킹 리스트 → 비움<br><br>"+
+    '<span class="warn">⚠️ 지금 작업 중인 사람이 있으면 그 기기에서도 데이터가 사라집니다.</span><br>'+
+    "[취소] 를 누르면 이 기기만 초기화된 상태로 둡니다.";
+  if(!await ask.confirm({title:"구글시트도 초기화할까요?",msg,danger:true,yes:"시트 비우기"}))
+    return toast("구글시트는 그대로 두었습니다","ok");
+  const pin2=await ask.text({title:"한 번 더 확인",msg:"관리자 PIN 을 다시 입력하세요",
+    password:true,numeric:true,yes:"초기화"});
+  if(pin2===null)return toast("구글시트는 그대로 두었습니다","ok");
+  if(pin2!==String(CFG.pin))
+    return toast("PIN 이 맞지 않아 시트는 건드리지 않았습니다","err");
+  S.busy=true; render();
+  try{
+    const j=await api("reset",{scope:"all",worker:CFG.worker||"관리자"});
+    if(!j.ok)throw new Error(j.error||"응답 오류");
+    S.remoteSnap=""; S.publishedBy=""; S.publishedAt="";
+    toast(`구글시트 초기화 완료 · 기록 ${(j.inspect||0)+(j.pick||0)+(j.errors||0)}건은 ARCHIVE 로 이동`,"ok");
+    await ask.alert({title:"구글시트 초기화 완료",
+      msg:`· 검수 ${j.inspect||0}건, 피킹 ${j.pick||0}줄, 오류 ${j.errors||0}건 → <b>ARCHIVE_ 탭</b><br>`+
+        `· 출고·피킹 데이터 ${j.cleared||0}행 비움<br><br>`+
+        "기록은 지워진 게 아니라 ARCHIVE_ 탭에 그대로 있습니다."});
+  }catch(e){
+    if(/unknown action/i.test(String(e&&e.message)))
+      await ask.alert({title:"구글시트 코드가 옛 버전입니다",
+        msg:"Code.gs 를 최신으로 올리고 <b>[새 버전]</b>으로 다시 배포한 뒤 시도하세요."});
+    else await ask.alert({title:"구글시트 초기화 실패",msg:esc(errMsg(e)).replace(/\n/g,"<br>")});
+  }
+  S.busy=false; render();
+}
+window.askServerReset=askServerReset;
+$("btnRemap").onclick=()=>{Store.set("map_orders",null);Store.set("map_loc",null);
+  toast("저장된 매핑을 지웠습니다. 다음 업로드 때 다시 확인합니다","ok")};
+document.addEventListener("dblclick",e=>e.preventDefault(),{passive:false});
+
+/* =========================================================================
+ *  바탕화면(홈 화면) 바로가기 — PWA 설치
+ *  manifest.json / icon-192.png / icon-512.png / sw.js 가 index.html과
+ *  같은 폴더에 있어야 동작합니다.
+ * ========================================================================= */
+let deferredInstallPrompt=null;
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent);
+const isStandalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault(); deferredInstallPrompt=e;
+  if(!isStandalone())$("btnInstall").style.display="";
+});
+window.addEventListener("appinstalled",()=>{
+  deferredInstallPrompt=null; $("btnInstall").style.display="none";
+  toast("바탕화면에 추가되었습니다","ok");
+});
+if(isIOS&&!isStandalone())$("btnInstall").style.display="";
+$("btnInstall").onclick=async()=>{
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt=null;
+    return;
+  }
+  if(isIOS){
+    await ask.alert({title:"홈 화면에 추가",
+      msg:"iPhone·iPad(Safari)는 자동 설치 버튼이 없습니다.<br><br>"+
+        "① 하단 <b>공유</b> 버튼(⬆️)을 누르세요<br>"+
+        "② <b>홈 화면에 추가</b>를 선택하세요"});
+    return;
+  }
+  await ask.alert({title:"바탕화면에 추가",
+    msg:"브라우저 주소창 오른쪽의 <b>설치</b>(⊕ 또는 화면 아이콘)를 눌러주세요.<br>"+
+      "메뉴 → <b>앱 설치</b> / <b>홈 화면에 추가</b> 로도 가능합니다."});
+};
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+}
+
+/* ---------- 부팅 ---------- */
+(function boot(){
+  // 1) 마지막으로 받은 데이터를 먼저 복원 → 오프라인이어도 바로 작업 가능
+  const c=Store.get("cache",null);
+  if(c&&((c.rows&&c.rows.length)||(c.pick&&c.pick.length))){
+    c.rows=c.rows||[];
+    const idm={}; FIELDS.forEach(f=>idm[f.k]=f.k);
+    S.skuMaster=new Map((c.sku||[]).map(x=>[norm(x.barcode),x.sku_code]));
+    (c.loc||[]).forEach(s=>addLoc(s.sku_code,s.location_code,s.zone,s.pick_priority));
+    try{ ingest(c.rows,c.snapshot_id,idm).then(()=>{render()}) }catch(e){}
+    try{ applyPick(c.pick) }catch(e){}
+    S.publishedBy=c.by||""; S.publishedAt=c.at||"";
+  }
+  // 작업 중이던 피킹 배치가 있으면 홈에서 [이어하기] 로 되살립니다 (자동 진입은 안 함)
+  restorePick();
+  render(); keepAwake();
+  // 2) 서버가 설정돼 있으면 최신본을 조용히 받아온다
+  if(CFG.api)setTimeout(()=>{pullServer(true).then(()=>{checkNew();pullProgress(true)})},300);
+  if(BOOT_MSG.length)setTimeout(()=>toast(BOOT_MSG[0],BOOT_MSG[0][0]==="⚠"?"err":"ok"),500);
+  if(!Store.healthy)setTimeout(()=>toast("저장소 접근 불가 — 새로고침 시 초기화됩니다","err"),800);
+})();
+</script>
+</body>
+</html>
